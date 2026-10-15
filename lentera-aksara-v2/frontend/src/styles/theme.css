@@ -1,0 +1,24 @@
+/* Tema Lentera Aksara — krem, merah marun, emas (mengikuti desain acuan) */
+:root{
+  --ink:#2B1A1D; --ink-soft:#6B5557;
+  --coral:#7B1E2B;      /* marun: tombol utama & aksen */
+  --maroon-dark:#5A1420;
+  --mustard:#C79A3B;    /* emas: highlight */
+  --teal:#4E7D5B;       /* hijau tenang: status tamat */
+  --cream:#F8EFE0; --paper:#FFFAF1; --line:#E9D9BC;
+  --radius:14px; --shadow:0 6px 24px rgba(90,20,32,.10);
+  --font-display:'Playfair Display',Georgia,serif; --font-body:'Inter',system-ui,sans-serif; --font-read:'Lora',Georgia,serif;
+}
+[data-theme="dark"]{ --cream:#1E1114; --paper:#2A171C; --ink:#F3E6D0; --ink-soft:#CDB9A6; --line:#43262C; --coral:#B5384A; --shadow:0 6px 24px rgba(0,0,0,.4); }
+*{box-sizing:border-box}
+body{margin:0;background:var(--cream);color:var(--ink);font-family:var(--font-body);transition:background .3s,color .3s}
+h1,h2,h3{font-family:var(--font-display);letter-spacing:.2px}
+.btn{border:0;border-radius:999px;padding:.7rem 1.4rem;font-weight:600;cursor:pointer;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+.btn-primary{background:var(--coral);color:#fff}.btn-dark{background:var(--maroon-dark);color:#F8EFE0}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.badge{font-size:.72rem;padding:.2rem .6rem;border-radius:999px;background:var(--teal);color:#fff}
+.badge.ongoing{background:var(--mustard);color:#3B1118}
+.page-enter{animation:fade .35s ease both}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.reader{font-family:var(--font-read);max-width:680px;margin:auto;line-height:var(--lh,1.9);font-size:var(--fs,18px)}
