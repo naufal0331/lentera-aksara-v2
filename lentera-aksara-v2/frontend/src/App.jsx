@@ -7,7 +7,7 @@ import { Guard, AuthorDash, NovelEditor } from './author.jsx';
 import { Home, Novel, Reader, Auth, Library } from './pages.jsx';
 import FireBackground from './FireBackground.jsx';
 import IceBackground from './IceBackground.jsx';
-import './styles/themes.css';
+import './styles/seasons.css';
 
 export default function App() {
   const nav = useNavigate();
