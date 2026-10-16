@@ -1,0 +1,86 @@
+.fire-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+ 
+html[data-theme="light"] #root,
+html[data-theme="light"] main,
+html[data-theme="light"] .page-enter,
+html[data-theme="dark"] #root,
+html[data-theme="dark"] main,
+html[data-theme="dark"] .page-enter {
+  background: transparent !important;
+}
+ 
+html[data-theme="light"] .card,
+html[data-theme="dark"] .card {
+  backdrop-filter: blur(6px);
+}
+ 
+/* ===== Mode matahari: api ===== */
+html[data-theme="light"] {
+  --cream: #140608;
+  --paper: rgba(42, 16, 22, 0.72);
+  --ink: #f5e6cc;
+  --ink-soft: #d9bfa6;
+  --line: rgba(255, 150, 60, 0.28);
+  --coral: #b5384a;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+html[data-theme="light"] body {
+  background:
+    radial-gradient(ellipse at 50% 115%, rgba(255,120,20,.45), transparent 55%),
+    #140608;
+}
+html[data-theme="light"] .nav {
+  background: rgba(90, 16, 30, 0.85);
+  backdrop-filter: blur(8px);
+}
+html[data-theme="light"] .card img {
+  animation: la-glow-fire 2.4s ease-in-out infinite alternate;
+}
+@keyframes la-glow-fire {
+  from { box-shadow: 0 0 10px rgba(255,160,50,.7), 0 0 24px rgba(255,90,0,.4); }
+  to   { box-shadow: 0 0 16px rgba(255,190,80,1), 0 0 40px rgba(255,90,0,.65); }
+}
+ 
+/* ===== Mode bulan: es ===== */
+html[data-theme="dark"] {
+  --cream: #06121f;
+  --paper: rgba(10, 40, 70, 0.62);
+  --ink: #e3f4ff;
+  --ink-soft: #a9cbe3;
+  --line: rgba(140, 205, 245, 0.28);
+  --coral: #6bbdea;
+  --maroon-dark: #0e3e68;
+  --mustard: #9fdbff;
+  --teal: #3e9c93;
+  --shadow: 0 6px 24px rgba(0, 20, 50, 0.5);
+}
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(ellipse at 50% 120%, rgba(60,160,230,.40), transparent 55%),
+    radial-gradient(ellipse at 0% 50%, rgba(60,160,230,.18), transparent 45%),
+    radial-gradient(ellipse at 100% 50%, rgba(60,160,230,.18), transparent 45%),
+    #06121f;
+}
+html[data-theme="dark"] .nav {
+  background: rgba(14, 62, 104, 0.78);
+  backdrop-filter: blur(8px);
+}
+html[data-theme="dark"] .btn-primary { color: #062a47; }
+html[data-theme="dark"] .btn-dark { color: #e3f4ff; }
+html[data-theme="dark"] .card img {
+  animation: la-glow-ice 2.8s ease-in-out infinite alternate;
+}
+@keyframes la-glow-ice {
+  from { box-shadow: 0 0 10px rgba(120,200,255,.6), 0 0 24px rgba(40,140,230,.35); }
+  to   { box-shadow: 0 0 16px rgba(190,235,255,.95), 0 0 40px rgba(40,140,230,.6); }
+}
+ 
+@media (prefers-reduced-motion: reduce) {
+  .card img { animation: none !important; }
+}
+ 
