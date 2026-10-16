@@ -5,6 +5,8 @@ import { AppCtx } from './ctx.js';
 import { AdminGuard, AdminDash } from './admin.jsx';
 import { Guard, AuthorDash, NovelEditor } from './author.jsx';
 import { Home, Novel, Reader, Auth, Library } from './pages.jsx';
+import FireBackground from './FireBackground.jsx';
+import './styles/fire.css';
 
 export default function App() {
   const nav = useNavigate();
@@ -17,6 +19,7 @@ export default function App() {
   const search = e => { e.preventDefault(); nav('/?q=' + encodeURIComponent(q)); };
   return (
     <AppCtx.Provider value={{ user, login, logout, theme, setTheme }}>
+      {theme === 'dark' && <FireBackground />}
       <header className="nav">
         <Link to="/" className="brand"><img src={asset('/logo.svg')} alt="Lentera Aksara" /><span>Lentera Aksara</span></Link>
         <form onSubmit={search} className="search"><input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari judul atau penulis…" /></form>
