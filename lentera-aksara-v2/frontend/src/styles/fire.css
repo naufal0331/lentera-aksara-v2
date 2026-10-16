@@ -1,0 +1,40 @@
+html[data-theme="dark"] body {
+  background: #140608;
+  color: #f5e6cc;
+}
+ 
+.fire-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+ 
+html[data-theme="dark"] #root,
+html[data-theme="dark"] main,
+html[data-theme="dark"] .page-enter {
+  background: transparent !important;
+}
+ 
+html[data-theme="dark"] .nav {
+  background: rgba(90, 16, 30, 0.85);
+  backdrop-filter: blur(8px);
+}
+ 
+html[data-theme="dark"] main img[src*="cover"],
+html[data-theme="dark"] main [class*="cover"] img,
+html[data-theme="dark"] main [class*="book"] img,
+html[data-theme="dark"] main [class*="card"] img {
+  border-radius: 8px;
+  animation: la-glow 2.4s ease-in-out infinite alternate;
+}
+ 
+@keyframes la-glow {
+  from { box-shadow: 0 0 10px rgba(255,160,50,.7), 0 0 24px rgba(255,90,0,.4); }
+  to   { box-shadow: 0 0 16px rgba(255,190,80,1), 0 0 40px rgba(255,90,0,.65); }
+}
+ 
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="dark"] main img { animation: none; }
+}
+ 
