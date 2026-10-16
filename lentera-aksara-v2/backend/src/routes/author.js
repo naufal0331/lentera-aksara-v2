@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
+import fs from 'fs';
+import { v2 as cloudinary } from 'cloudinary';
 import crypto from 'crypto';
 import { z } from 'zod';
 import { db } from '../db.js';
@@ -8,9 +10,17 @@ const r = Router();
 r.use(auth, requireRole('author', 'admin'));
 
 const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
-const upload = multer({ limits: { fileSize: 2 * 1024 * 1024 },
-  fileFilter: (_q, f, cb) => cb(null, !!EXT[f.mimetype]),
-  storage: multer.diskStorage({ destination: 'uploads', filename: (_q, f, cb) => cb(null, crypto.randomUUID() + EXT[f.mimetype]) }) });
+const upload = multer({ limits: { fileSize: 2 * 1024 * 1024 }, storage: multer.memoryStorage(),
+  fileFilter: (_q, f, cb) => cb(null, !!EXT[f.mimetype]) });
+// Cover disimpan di Cloudinary bila CLOUDINARY_URL diisi (online); kalau tidak, di folder uploads (lokal)
+const toCloud = buf => new Promise((ok, no) => cloudinary.uploader.upload_stream(
+  { folder: 'lentera-aksara/covers', resource_type: 'image' }, (e, r) => e ? no(e) : ok(r.secure_url)).end(buf));
+async function saveCover(file) {
+  if (process.env.CLOUDINARY_URL) return toCloud(file.buffer);
+  const name = crypto.randomUUID() + EXT[file.mimetype];
+  fs.writeFileSync('uploads/' + name, file.buffer);
+  return `${process.env.API_URL || 'http://localhost:4000'}/uploads/${name}`;
+}
 
 const novelSchema = z.object({ title: z.string().min(3, 'Judul minimal 3 karakter').max(150),
   synopsis: z.string().max(3000).default(''), tags: z.string().max(255).default(''),
@@ -56,7 +66,8 @@ r.put('/novels/:id', own, validate(novelSchema), async (req, res) => {
 
 r.post('/novels/:id/cover', own, upload.single('cover'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Gunakan gambar JPG/PNG/WEBP maksimal 2 MB.' });
-  const url = `${process.env.API_URL || 'http://localhost:4000'}/uploads/${req.file.filename}`;
+  let url;
+  try { url = await saveCover(req.file); } catch (e) { console.error(e); return res.status(502).json({ error: 'Gagal mengunggah gambar. Coba lagi.' }); }
   await db.query('UPDATE novels SET cover_url=? WHERE id=?', [url, req.params.id]); res.json({ cover_url: url });
 });
 
