@@ -6,7 +6,7 @@ CREATE TABLE users(
   bio TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE genres(id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(40) UNIQUE NOT NULL, slug VARCHAR(40) UNIQUE NOT NULL);
 CREATE TABLE novels(
-  id INT AUTO_INCREMENT PRIMARY KEY, author_id INT NOT NULL, title VARCHAR(150) NOT NULL,
+  id INT AUTO_INCREMENT PRIMARY KEY, author_id INT NOT NULL, type ENUM('novel','comic') NOT NULL DEFAULT 'novel', title VARCHAR(150) NOT NULL,
   synopsis TEXT, cover_url VARCHAR(255), tags VARCHAR(255),
   status ENUM('ongoing','completed') DEFAULT 'ongoing',
   publish_status ENUM('draft','pending','published','rejected') DEFAULT 'draft',
@@ -21,6 +21,9 @@ CREATE TABLE chapters(
   content MEDIUMTEXT, status ENUM('draft','published') DEFAULT 'draft',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(novel_id,number),
   FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE);
+CREATE TABLE chapter_pages(
+  id INT AUTO_INCREMENT PRIMARY KEY, chapter_id INT NOT NULL, position INT NOT NULL, image_url VARCHAR(500) NOT NULL,
+  KEY(chapter_id,position), FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE);
 CREATE TABLE library(user_id INT, novel_id INT, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_id,novel_id),
   FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE);
 CREATE TABLE reading_progress(user_id INT, novel_id INT, chapter_id INT NOT NULL, scroll_pct TINYINT DEFAULT 0,

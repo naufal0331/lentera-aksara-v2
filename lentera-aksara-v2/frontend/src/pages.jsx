@@ -16,7 +16,7 @@ export const NovelCard = ({ n }) => (
   <Link to={`/novel/${n.id}`} className="ncard card">
     <img className="cover" src={asset(n.cover_url)} alt={n.title} loading="lazy" />
     <div className="ninfo"><b>{n.title}</b><small>{n.author}</small><small>{n.genres}</small>
-      <div className="row"><span className={'badge ' + n.status}>{label(n.status)}</span>{n.views != null && <small>👁 {n.views.toLocaleString('id-ID')}</small>}</div></div>
+      <div className="row">{n.type === 'comic' && <span className="badge ongoing">Komik</span>}<span className={'badge ' + n.status}>{label(n.status)}</span>{n.views != null && <small>👁 {n.views.toLocaleString('id-ID')}</small>}</div></div>
   </Link>);
 const Grid = ({ items }) => <div className="grid">{items.map(n => <NovelCard key={n.id} n={n} />)}</div>;
 
@@ -35,21 +35,22 @@ function Hero({ items }) {
 
 export function Home() {
   const [sp, setSp] = useSearchParams();
-  const q = sp.get('q') || '', genre = sp.get('genre') || '';
+  const q = sp.get('q') || '', genre = sp.get('genre') || '', type = sp.get('type') || '';
   const genres = useFetch('/novels/genres');
-  const qs = new URLSearchParams({ ...(q && { q }), ...(genre && { genre }) }).toString();
+  const qs = new URLSearchParams({ ...(q && { q }), ...(genre && { genre }), ...(type && { type }) }).toString();
   const list = useFetch('/novels?' + qs + '&sort=new');
-  const pop = useFetch('/novels?sort=popular');
-  const rec = useFetch('/novels?sort=recommended');
-  const pick = g => { const p = {}; if (q) p.q = q; if (g) p.genre = g; setSp(p); };
+  const pop = useFetch('/novels?sort=popular' + (type ? '&type=' + type : ''));
+  const rec = useFetch('/novels?sort=recommended' + (type ? '&type=' + type : ''));
+  const pick = g => { const p = {}; if (q) p.q = q; if (g) p.genre = g; if (type) p.type = type; setSp(p); };
   const top = pop.data?.items?.[0];
   return (<>
-    {!q && !genre && pop.data?.items?.length > 0 && <Hero items={pop.data.items.slice(0, 5)} />}
+    {!q && !genre && !type && pop.data?.items?.length > 0 && <Hero items={pop.data.items.slice(0, 5)} />}
+    <div className="chips">{[['', 'Semua'], ['novel', '📖 Novel'], ['comic', '🎨 Komik']].map(([v, l]) => <button key={v} className={type === v ? 'on' : ''} onClick={() => { const p = {}; if (q) p.q = q; if (genre) p.genre = genre; if (v) p.type = v; setSp(p); }}>{l}</button>)}</div>
     <div className="chips">
       <button className={!genre ? 'on' : ''} onClick={() => pick('')}>Semua</button>
       {genres.data?.map(g => <button key={g.id} className={genre === g.slug ? 'on' : ''} onClick={() => pick(g.slug)}>{g.name}</button>)}
     </div>
-    {q || genre ? <section><h2>Hasil{q && ` untuk "${q}"`}</h2>
+    {q || genre || type ? <section><h2>Hasil{q && ` untuk "${q}"`}</h2>
         <State s={list} empty={list.data?.items.length === 0}>{list.data && <Grid items={list.data.items} />}</State></section>
       : <>
         <section><h2>🔥 Populer</h2><State s={pop} empty={pop.data?.items.length === 0}>{pop.data && <Grid items={pop.data.items} />}</State></section>
@@ -104,9 +105,9 @@ export function Reader() {
         <button onClick={() => setLh(Math.max(1.4, +(lh - 0.2).toFixed(1)))}>☰−</button><button onClick={() => setLh(Math.min(2.6, +(lh + 0.2).toFixed(1)))}>☰+</button>
         <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀️' : '🌙'}</button>
         <button onClick={mark}>{bm ? '🔖' : '🏷️'}</button></span></div>
-    <article className="reader" style={{ '--fs': fs + 'px', '--lh': lh }}>
+    <article className={'reader' + (c.pages?.length ? ' comic' : '')} style={{ '--fs': fs + 'px', '--lh': lh }}>
       <h2>Bab {c.number}: {c.title}</h2>
-      {c.content.split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}</article>
+      {c.pages?.length ? c.pages.map((u, i) => <img key={i} className="cpage" src={asset(u)} alt={`Halaman ${i + 1}`} loading="lazy" />) : (c.content || '').split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}</article>
     <div className="pager">
       {c.prev ? <Link className="btn btn-dark" to={`/read/${id}/${c.prev}`}>← Sebelumnya</Link> : <span />}
       {c.next ? <Link className="btn btn-primary" to={`/read/${id}/${c.next}`}>Berikutnya →</Link> : <Link className="btn btn-dark" to={`/novel/${id}`}>Selesai</Link>}</div></>}</State>);

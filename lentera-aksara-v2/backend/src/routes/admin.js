@@ -22,7 +22,7 @@ r.patch('/users/:id', validate(z.object({ role: z.enum(['reader', 'author', 'adm
   res.json({ ok: true }); }));
 
 r.get('/novels', A(async (req, res) => { const st = req.query.status || '';
-  res.json((await db.query(`SELECT n.id,n.title,n.synopsis,n.publish_status,n.status,n.views,u.username AS author,
+  res.json((await db.query(`SELECT n.id,n.title,n.type,n.synopsis,n.publish_status,n.status,n.views,u.username AS author,
     (SELECT COUNT(*) FROM chapters c WHERE c.novel_id=n.id) AS chapters FROM novels n JOIN users u ON u.id=n.author_id
     WHERE (?='' OR n.publish_status=?) ORDER BY n.updated_at DESC LIMIT 100`, [st, st]))[0]); }));
 r.patch('/novels/:id/status', validate(z.object({ publish_status: z.enum(['published', 'rejected', 'draft']) })), A(async (req, res) => {
@@ -30,7 +30,9 @@ r.patch('/novels/:id/status', validate(z.object({ publish_status: z.enum(['publi
 r.delete('/novels/:id', A(async (req, res) => { await db.query('DELETE FROM novels WHERE id=?', [req.params.id]); res.json({ ok: true }); }));
 r.get('/novels/:id/chapters', A(async (req, res) => res.json((await db.query('SELECT id,number,title,status FROM chapters WHERE novel_id=? ORDER BY number', [req.params.id]))[0])));
 r.get('/chapters/:chId', A(async (req, res) => { const [[c]] = await db.query('SELECT id,title,content FROM chapters WHERE id=?', [req.params.chId]);
-  c ? res.json(c) : res.status(404).json({ error: 'Bab tidak ditemukan.' }); }));
+  if (!c) return res.status(404).json({ error: 'Bab tidak ditemukan.' });
+  const [pg] = await db.query('SELECT image_url FROM chapter_pages WHERE chapter_id=? ORDER BY position', [c.id]);
+  res.json({ ...c, pages: pg.map(x => x.image_url) }); }));
 r.delete('/chapters/:chId', A(async (req, res) => { await db.query('DELETE FROM chapters WHERE id=?', [req.params.chId]); res.json({ ok: true }); }));
 
 r.post('/genres', validate(z.object({ name: z.string().min(2).max(40) })), A(async (req, res) => {

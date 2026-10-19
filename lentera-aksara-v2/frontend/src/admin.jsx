@@ -28,7 +28,7 @@ function Detail({ id }) {
   return <div className="detail-box">{cs.length === 0 ? <small>Belum ada bab.</small> : cs.map(c => <div className="row" key={c.id} style={{ justifyContent: 'space-between' }}>
     <span>Bab {c.number} — {c.title} <span className="badge">{c.status === 'published' ? 'Terbit' : 'Draf'}</span></span>
     <span><button className="icon" onClick={() => show(c)}>Lihat</button> <button className="icon" onClick={() => del(c)}>Hapus</button></span></div>)}
-    {view && <div className="card" style={{ padding: '1rem', marginTop: '.6rem', whiteSpace: 'pre-wrap' }}><b>{view.title}</b><br />{view.content || '(kosong)'}</div>}</div>;
+    {view && <div className="card" style={{ padding: '1rem', marginTop: '.6rem', whiteSpace: 'pre-wrap' }}><b>{view.title}</b><br />{view.pages?.length ? view.pages.map((u, i) => <img key={i} src={u} alt="" style={{ width: '100%', display: 'block' }} />) : (view.content || '(kosong)')}</div>}</div>;
 }
 
 function Novels({ fixed }) {

@@ -23,7 +23,7 @@ export function AuthorDash() {
     {s.data.length === 0 ? <p className="state">Anda belum punya novel. Klik “Novel Baru” untuk mulai menulis.</p> :
       s.data.map(n => <Link key={n.id} to={`/penulis/novel/${n.id}`} className="arow card">
         <img src={asset(n.cover_url || '/covers/pena.svg')} alt="" />
-        <div><b>{n.title}</b><div className="row"><span className="badge">{PUB[n.publish_status]}</span>
+        <div><b>{n.title}</b><div className="row">{n.type === 'comic' && <span className="badge ongoing">Komik</span>}<span className="badge">{PUB[n.publish_status]}</span>
           <span className={'badge ' + n.status}>{n.status === 'completed' ? 'Tamat' : 'Berlanjut'}</span></div>
           <small>{n.chapters} bab · 👁 {n.views} · 📚 {n.saves} disimpan</small></div></Link>)}</>);
 }
@@ -31,10 +31,10 @@ export function AuthorDash() {
 export function NovelEditor() {
   const { id } = useParams(); const nav = useNavigate(); const isNew = id === 'baru';
   const [genres, setGenres] = useState([]); const [novel, setNovel] = useState(null);
-  const [f, setF] = useState({ title: '', synopsis: '', tags: '', status: 'ongoing', genreIds: [] });
+  const [f, setF] = useState({ title: '', synopsis: '', tags: '', status: 'ongoing', type: 'novel', genreIds: [] });
   const [msg, setMsg] = useState(''); const [ch, setCh] = useState(null);
   const load = async () => { if (isNew) return; const n = await api('/author/novels/' + id); setNovel(n);
-    setF({ title: n.title, synopsis: n.synopsis || '', tags: n.tags || '', status: n.status, genreIds: n.genreIds }); };
+    setF({ title: n.title, synopsis: n.synopsis || '', tags: n.tags || '', status: n.status, type: n.type, genreIds: n.genreIds }); };
   useEffect(() => { api('/novels/genres').then(setGenres); load().catch(e => setMsg('⚠ ' + e.message)); }, [id]);
   const run = async fn => { try { setMsg(''); await fn(); } catch (e) { setMsg('⚠ ' + e.message); } };
   const set = k => e => setF({ ...f, [k]: e.target.value });
@@ -47,8 +47,15 @@ export function NovelEditor() {
   const del = () => confirm('Hapus novel beserta semua babnya?') && run(async () => { await api('/author/novels/' + id, { method: 'DELETE' }); nav('/penulis'); });
   const openCh = c => run(async () => setCh(c ? await api(`/author/novels/${id}/chapters/${c.id}`) : { title: '', content: '', status: 'draft' }));
   const saveCh = () => run(async () => { const b = { title: ch.title, content: ch.content, status: ch.status };
-    await api(`/author/novels/${id}/chapters${ch.id ? '/' + ch.id : ''}`, { method: ch.id ? 'PUT' : 'POST', body: b });
-    setCh(null); await load(); setMsg('✓ Bab tersimpan'); });
+    const r = await api(`/author/novels/${id}/chapters${ch.id ? '/' + ch.id : ''}`, { method: ch.id ? 'PUT' : 'POST', body: b });
+    await load();
+    if (novel.type === 'comic') { setCh(await api(`/author/novels/${id}/chapters/${ch.id || r.id}`)); setMsg('✓ Bab tersimpan. Unggah halaman komik di bawah.'); }
+    else { setCh(null); setMsg('✓ Bab tersimpan'); } });
+  const uploadPages = e => run(async () => { const files = [...e.target.files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    const fd = new FormData(); files.forEach(x => fd.append('pages', x));
+    await api(`/author/novels/${id}/chapters/${ch.id}/pages`, { method: 'POST', body: fd }); e.target.value = '';
+    setCh(await api(`/author/novels/${id}/chapters/${ch.id}`)); setMsg('✓ Halaman diunggah'); });
+  const delPage = p => confirm('Hapus halaman ini?') && run(async () => { await api(`/author/novels/${id}/chapters/${ch.id}/pages/${p.id}`, { method: 'DELETE' }); setCh(await api(`/author/novels/${id}/chapters/${ch.id}`)); });
   const delCh = c => confirm('Hapus bab ini?') && run(async () => { await api(`/author/novels/${id}/chapters/${c.id}`, { method: 'DELETE' }); await load(); });
   return (<div className="editor"><Link to="/penulis">← Dashboard</Link><h2>{isNew ? 'Novel Baru' : 'Kelola Novel'}</h2>
     {msg && <p className={'state ' + (msg.startsWith('⚠') ? 'err' : '')}>{msg}</p>}
@@ -57,6 +64,7 @@ export function NovelEditor() {
       <textarea rows={5} placeholder="Sinopsis" value={f.synopsis} onChange={set('synopsis')} />
       <input placeholder="Tag (pisahkan dengan koma)" value={f.tags} onChange={set('tags')} />
       <select value={f.status} onChange={set('status')}><option value="ongoing">Berlanjut</option><option value="completed">Tamat</option></select>
+      {isNew ? <select value={f.type} onChange={set('type')}><option value="novel">📖 Novel (tulisan)</option><option value="comic">🎨 Komik (gambar)</option></select> : <small>Jenis: {f.type === 'comic' ? 'Komik' : 'Novel'}</small>}
       <div className="chips">{genres.map(g => <button type="button" key={g.id} className={f.genreIds.includes(g.id) ? 'on' : ''} onClick={() => toggleG(g.id)}>{g.name}</button>)}</div>
       <button className="btn btn-primary" onClick={save}>{isNew ? 'Buat Novel' : 'Simpan Perubahan'}</button></div>
     {!isNew && novel && <>
@@ -68,7 +76,10 @@ export function NovelEditor() {
           <span>Bab {c.number} — {c.title} <span className="badge">{c.status === 'published' ? 'Terbit' : 'Draf'}</span></span>
           <span><button className="icon" onClick={() => openCh(c)}>Edit</button> <button className="icon" onClick={() => delCh(c)}>Hapus</button></span></li>)}</ul>
         {ch && <div className="form"><input placeholder="Judul bab" value={ch.title} onChange={e => setCh({ ...ch, title: e.target.value })} />
-          <textarea rows={14} placeholder="Tulis isi bab di sini…" value={ch.content} onChange={e => setCh({ ...ch, content: e.target.value })} />
+          {novel.type === 'comic' ? (ch.id ? <div className="form"><input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={uploadPages} /><small>JPG/PNG/WEBP, maks. 3 MB per gambar dan 20 gambar sekali unggah. Urutan baca mengikuti nama file (001, 002, …).</small>
+            <div className="pgrid">{(ch.pages || []).map((p, i) => <div key={p.id} className="pthumb"><img src={asset(p.image_url)} alt="" /><span>{i + 1}</span><button className="icon" onClick={() => delPage(p)}>✕</button></div>)}</div></div>
+            : <p className="state">Simpan bab dulu, lalu unggah halaman komiknya.</p>)
+            : <textarea rows={14} placeholder="Tulis isi bab di sini…" value={ch.content} onChange={e => setCh({ ...ch, content: e.target.value })} />}
           <select value={ch.status} onChange={e => setCh({ ...ch, status: e.target.value })}><option value="draft">Simpan sebagai draf</option><option value="published">Terbitkan bab</option></select>
           <div className="row"><button className="btn btn-primary" onClick={saveCh}>Simpan Bab</button><button className="btn btn-dark" onClick={() => setCh(null)}>Batal</button></div></div>}</div>
       <div className="card form"><h3>Penerbitan</h3><p>Status: <span className="badge">{PUB[novel.publish_status]}</span></p>
