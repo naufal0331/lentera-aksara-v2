@@ -7,7 +7,9 @@
   "start": "node src/server.js",
   "seed": "node scripts/seed-passwords.js",
   "db:import": "node --env-file=.env.cloud scripts/import-schema.js",
-  "db:seed": "node --env-file=.env.cloud scripts/seed-passwords.js"
+  "db:seed": "node --env-file=.env.cloud scripts/seed-passwords.js",
+  "migrate": "node scripts/migrate-komik.js",
+  "db:migrate": "node --env-file=.env.cloud scripts/migrate-komik.js"
  },
  "dependencies": {
   "bcryptjs": "^2.4.3",
