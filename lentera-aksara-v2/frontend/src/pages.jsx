@@ -139,3 +139,22 @@ export function Library() {
     <section><h2>🕘 Riwayat Membaca</h2><State s={his} empty={his.data?.length === 0}>
       <ul className="chlist">{his.data?.map(h => <li key={h.novel_id}><Link to={`/read/${h.novel_id}/${h.chapter_number}`}>{h.title} — Bab {h.chapter_number} ({h.scroll_pct}%) · Lanjutkan</Link></li>)}</ul></State></section></>);
 }
+
+// Halaman akun (menu profil di HP)
+const ROLE = { reader: 'Pembaca', author: 'Penulis', admin: 'Admin' };
+export function Account() {
+  const { user, logout, theme, setTheme } = useApp();
+  if (!user) return <p className="state">Silakan <Link to="/masuk">masuk</Link> untuk melihat akun Anda.</p>;
+  const canWrite = ['author', 'admin'].includes(user.role);
+  return (<div className="acc">
+    <div className="card acc-head"><div className="avatar">{user.username[0].toUpperCase()}</div>
+      <div><b>{user.username}</b><br /><small>{user.email}</small><br /><span className="badge ongoing">{ROLE[user.role]}</span></div></div>
+    <div className="card acc-menu">
+      <Link to="/perpustakaan">📚 Perpustakaan dan Riwayat Membaca <span>›</span></Link>
+      {canWrite && <Link to="/penulis">✍️ Dashboard Penulis <span>›</span></Link>}
+      {canWrite && <Link to="/penulis/novel">📖 Dashboard Novel <span>›</span></Link>}
+      {canWrite && <Link to="/penulis/komik">🎨 Dashboard Komik <span>›</span></Link>}
+      {user.role === 'admin' && <Link to="/admin">🛡️ Dashboard Admin <span>›</span></Link>}
+      <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀️ Mode terang' : '🌙 Mode gelap'}</button>
+      <button onClick={logout}>🚪 Keluar</button></div></div>);
+}

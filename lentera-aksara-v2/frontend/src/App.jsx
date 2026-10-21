@@ -21,7 +21,8 @@ import {
   Novel,
   Reader,
   Auth,
-  Library
+  Library,
+  Account
 } from './pages.jsx';
 
 // Pertahankan latar musiman dan CSS yang sudah digunakan proyek.
@@ -146,6 +147,9 @@ export default function App() {
           <Route path="/daftar" element={<Auth mode="daftar" />} />
           <Route path="/perpustakaan" element={<Library />} />
 
+          {/* Halaman akun (menu profil di HP) */}
+          <Route path="/akun" element={<Account />} />
+
           {/* Dashboard semua karya penulis */}
           <Route
             path="/penulis"
@@ -217,7 +221,7 @@ export default function App() {
           <small>Pustaka</small>
         </NavLink>
 
-        <NavLink to={user ? '/perpustakaan' : '/masuk'}>
+        <NavLink to={user ? '/akun' : '/masuk'}>
           👤
           <small>{user ? user.username : 'Masuk'}</small>
         </NavLink>
