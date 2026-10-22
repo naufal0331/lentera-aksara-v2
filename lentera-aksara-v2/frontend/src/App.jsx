@@ -84,7 +84,7 @@ export default function App() {
 
       <header className="nav">
         <Link to="/" className="brand">
-          <img src={asset('/logo.svg')} alt="Lentera Aksara" />
+          <img src={asset('/LogoLA.jpeg')} alt="Lentera Aksara" />
           <span>Lentera Aksara</span>
         </Link>
 
