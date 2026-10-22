@@ -29,4 +29,22 @@ r.get('/me', auth, async (req, res) => {
   const [[u]] = await db.query('SELECT id,username,email,role,bio,created_at FROM users WHERE id=?', [req.user.id]);
   res.json(u);
 });
+// Profil dan password
+const A = fn => (q, s, n) => Promise.resolve(fn(q, s, n)).catch(n);
+r.put('/profile', auth, validate(z.object({
+  username: z.string().min(3, 'Username minimal 3 karakter').max(40).regex(/^[A-Za-z0-9_.-]+$/, 'Username hanya boleh huruf, angka, titik, garis bawah, atau strip'),
+  bio: z.string().max(500, 'Bio maksimal 500 karakter').default('') })), A(async (req, res) => {
+  const { username, bio } = req.body;
+  const [dup] = await db.query('SELECT id FROM users WHERE username=? AND id<>?', [username, req.user.id]);
+  if (dup.length) return res.status(409).json({ error: 'Username sudah dipakai.' });
+  await db.query('UPDATE users SET username=?, bio=? WHERE id=?', [username, bio, req.user.id]);
+  res.json({ username, bio });
+}));
+r.put('/password', auth, validate(z.object({ current: z.string().min(1, 'Isi password saat ini'), next: z.string().min(8, 'Password baru minimal 8 karakter') })), A(async (req, res) => {
+  const [[u]] = await db.query('SELECT password_hash FROM users WHERE id=?', [req.user.id]);
+  if (!u || !(await bcrypt.compare(req.body.current, u.password_hash))) return res.status(400).json({ error: 'Password saat ini salah.' });
+  await db.query('UPDATE users SET password_hash=? WHERE id=?', [await bcrypt.hash(req.body.next, 12), req.user.id]);
+  res.json({ ok: true });
+}));
+r.use((err, _q, res, _n) => { console.error(err); res.status(500).json({ error: 'Terjadi kesalahan pada server.' }); });
 export default r;

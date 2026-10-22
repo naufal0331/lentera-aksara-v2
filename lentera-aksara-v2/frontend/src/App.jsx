@@ -24,6 +24,7 @@ import {
   Library,
   Account
 } from './pages.jsx';
+import { Bell, Notifications, Bookmarks, Profile } from './social.jsx';
 
 // Pertahankan latar musiman dan CSS yang sudah digunakan proyek.
 import FireBackground from './FireBackground.jsx';
@@ -83,7 +84,7 @@ export default function App() {
 
       <header className="nav">
         <Link to="/" className="brand">
-          <img src={asset('LogoLA.jpeg')} alt="Lentera Aksara" />
+          <img src={asset('/logo.svg')} alt="Lentera Aksara" />
           <span>Lentera Aksara</span>
         </Link>
 
@@ -120,6 +121,7 @@ export default function App() {
               )}
 
               <Link to="/perpustakaan">Perpustakaan</Link>
+              <Bell />
 
               <button
                 type="button"
@@ -149,6 +151,9 @@ export default function App() {
 
           {/* Halaman akun (menu profil di HP) */}
           <Route path="/akun" element={<Account />} />
+          <Route path="/notifikasi" element={<Notifications />} />
+          <Route path="/bookmark" element={<Bookmarks />} />
+          <Route path="/profil" element={<Profile />} />
 
           {/* Dashboard semua karya penulis */}
           <Route

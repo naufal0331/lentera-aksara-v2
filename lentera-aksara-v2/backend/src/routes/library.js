@@ -22,6 +22,10 @@ r.get('/history', async (req, res) => res.json((await db.query(
    FROM reading_progress p JOIN novels n ON n.id=p.novel_id JOIN chapters c ON c.id=p.chapter_id
    WHERE p.user_id=? ORDER BY p.updated_at DESC`, [req.user.id]))[0]));
 
+r.get('/bookmarks', async (req, res) => res.json((await db.query(
+  `SELECT b.chapter_id,b.created_at,c.number,c.title AS chapter_title,n.id AS novel_id,n.title AS novel_title,n.type
+   FROM bookmarks b JOIN chapters c ON c.id=b.chapter_id JOIN novels n ON n.id=c.novel_id
+   WHERE b.user_id=? AND n.publish_status='published' ORDER BY b.created_at DESC`, [req.user.id]))[0]));
 r.post('/bookmarks/:chapterId', async (req, res) => { await db.query('INSERT IGNORE INTO bookmarks(user_id,chapter_id) VALUES(?,?)', [req.user.id, req.params.chapterId]); res.status(201).json({ ok: true }); });
 r.delete('/bookmarks/:chapterId', async (req, res) => { await db.query('DELETE FROM bookmarks WHERE user_id=? AND chapter_id=?', [req.user.id, req.params.chapterId]); res.json({ ok: true }); });
 // Pembaca melaporkan novel ke admin

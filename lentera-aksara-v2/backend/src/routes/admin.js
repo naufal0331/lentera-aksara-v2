@@ -26,7 +26,11 @@ r.get('/novels', A(async (req, res) => { const st = req.query.status || '';
     (SELECT COUNT(*) FROM chapters c WHERE c.novel_id=n.id) AS chapters FROM novels n JOIN users u ON u.id=n.author_id
     WHERE (?='' OR n.publish_status=?) ORDER BY n.updated_at DESC LIMIT 100`, [st, st]))[0]); }));
 r.patch('/novels/:id/status', validate(z.object({ publish_status: z.enum(['published', 'rejected', 'draft']) })), A(async (req, res) => {
-  await db.query('UPDATE novels SET publish_status=? WHERE id=?', [req.body.publish_status, req.params.id]); res.json({ ok: true }); }));
+  await db.query('UPDATE novels SET publish_status=? WHERE id=?', [req.body.publish_status, req.params.id]);
+  const [[n]] = await db.query('SELECT title,author_id FROM novels WHERE id=?', [req.params.id]);
+  if (n && req.body.publish_status !== 'draft') await db.query('INSERT INTO notifications(user_id,message,link) VALUES(?,?,?)',
+    [n.author_id, req.body.publish_status === 'published' ? `Karya "${n.title}" disetujui dan sudah terbit 🎉` : `Karya "${n.title}" ditolak admin`, '/penulis']);
+  res.json({ ok: true }); }));
 r.delete('/novels/:id', A(async (req, res) => { await db.query('DELETE FROM novels WHERE id=?', [req.params.id]); res.json({ ok: true }); }));
 r.get('/novels/:id/chapters', A(async (req, res) => res.json((await db.query('SELECT id,number,title,status FROM chapters WHERE novel_id=? ORDER BY number', [req.params.id]))[0])));
 r.get('/chapters/:chId', A(async (req, res) => { const [[c]] = await db.query('SELECT id,title,content FROM chapters WHERE id=?', [req.params.chId]);

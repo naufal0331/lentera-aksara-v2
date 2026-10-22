@@ -59,3 +59,12 @@ main{max-width:1100px;margin:auto;padding:1rem 1rem 5rem}
 .acc{max-width:520px;margin:auto}.acc-head{display:flex;align-items:center;gap:1rem;padding:1.2rem;margin-bottom:1rem}
 .avatar{width:60px;height:60px;border-radius:50%;background:var(--coral);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:1.6rem;flex:none}
 .acc-menu{display:flex;flex-direction:column;overflow:hidden}.acc-menu a,.acc-menu button{display:flex;justify-content:space-between;padding:1rem 1.2rem;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);font:inherit;text-decoration:none;cursor:pointer;text-align:left}
+
+/* Komentar, notifikasi, bookmark, profil */
+.bell{position:relative;font-size:1.1rem}.bell .dot{position:absolute;top:-6px;right:-10px;background:var(--mustard);color:#3B1118;border-radius:999px;font-size:.65rem;padding:0 .35rem;font-weight:700}
+.comments{max-width:680px;margin:2rem auto}.cform{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem}
+.cform textarea{padding:.7rem;border-radius:10px;border:1px solid var(--line);background:var(--cream);color:var(--ink);font:inherit}.cform .btn{align-self:flex-end}
+.comment{padding:.8rem 1rem;margin-bottom:.6rem}.comment p{margin:.4rem 0;white-space:pre-wrap;word-break:break-word}
+.notif{display:block;padding:.8rem 1rem;margin-bottom:.6rem;text-decoration:none;color:inherit}.notif.new{border-left:4px solid var(--mustard)}.notif small{display:block}
+.bmrow{display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.8rem 1rem;margin-bottom:.6rem}.bmrow a{color:var(--ink);text-decoration:none}
+.form label{display:flex;flex-direction:column;gap:.3rem;font-size:.9rem}

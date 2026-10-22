@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { asset } from './asset.js';
 import { api } from './api.js';
 import { useApp } from './ctx.js';
+import { Comments } from './social.jsx';
 
 function useFetch(path) {
   const [s, set] = useState({ loading: true });
@@ -87,6 +88,7 @@ export function Reader() {
   const [bm, setBm] = useState(false);
   useEffect(() => { localStorage.la_fs = fs; localStorage.la_lh = lh; }, [fs, lh]);
   useEffect(() => { window.scrollTo(0, 0); setBm(false); }, [num]);
+  useEffect(() => { if (user && c) api('/library/bookmarks').then(l => setBm(l.some(b => b.chapter_id === c.id))).catch(() => {}); }, [user, c]);
   useEffect(() => {
     if (!user || !c) return; let t;
     const send = () => { const h = document.documentElement;
@@ -110,7 +112,8 @@ export function Reader() {
       {c.pages?.length ? c.pages.map((u, i) => <img key={i} className="cpage" src={asset(u)} alt={`Halaman ${i + 1}`} loading="lazy" />) : (c.content || '').split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}</article>
     <div className="pager">
       {c.prev ? <Link className="btn btn-dark" to={`/read/${id}/${c.prev}`}>← Sebelumnya</Link> : <span />}
-      {c.next ? <Link className="btn btn-primary" to={`/read/${id}/${c.next}`}>Berikutnya →</Link> : <Link className="btn btn-dark" to={`/novel/${id}`}>Selesai</Link>}</div></>}</State>);
+      {c.next ? <Link className="btn btn-primary" to={`/read/${id}/${c.next}`}>Berikutnya →</Link> : <Link className="btn btn-dark" to={`/novel/${id}`}>Selesai</Link>}</div>
+    <Comments chapterId={c.id} /></>}</State>);
 }
 
 export function Auth({ mode }) {
@@ -151,6 +154,9 @@ export function Account() {
       <div><b>{user.username}</b><br /><small>{user.email}</small><br /><span className="badge ongoing">{ROLE[user.role]}</span></div></div>
     <div className="card acc-menu">
       <Link to="/perpustakaan">📚 Perpustakaan dan Riwayat Membaca <span>›</span></Link>
+      <Link to="/notifikasi">🔔 Notifikasi <span>›</span></Link>
+      <Link to="/bookmark">🔖 Bookmark <span>›</span></Link>
+      <Link to="/profil">⚙️ Edit Profil <span>›</span></Link>
       {canWrite && <Link to="/penulis">✍️ Dashboard Penulis <span>›</span></Link>}
       {canWrite && <Link to="/penulis/novel">📖 Dashboard Novel <span>›</span></Link>}
       {canWrite && <Link to="/penulis/komik">🎨 Dashboard Komik <span>›</span></Link>}

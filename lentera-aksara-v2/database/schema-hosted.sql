@@ -38,7 +38,7 @@ CREATE TABLE comments(id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, chapter_id
 CREATE TABLE reports(id INT AUTO_INCREMENT PRIMARY KEY, reporter_id INT, novel_id INT, reason VARCHAR(500),
   status ENUM('open','resolved') DEFAULT 'open', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(reporter_id) REFERENCES users(id) ON DELETE CASCADE, FOREIGN KEY(novel_id) REFERENCES novels(id) ON DELETE CASCADE);
-CREATE TABLE notifications(id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, message VARCHAR(255), is_read TINYINT(1) DEFAULT 0,
+CREATE TABLE notifications(id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, message VARCHAR(255), link VARCHAR(255), is_read TINYINT(1) DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE);
 
 -- DATA CONTOH (password diisi lewat: npm run seed -> "Password123!")

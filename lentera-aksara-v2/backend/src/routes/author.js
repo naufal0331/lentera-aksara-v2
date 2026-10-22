@@ -24,6 +24,14 @@ async function saveCover(file, sub = 'covers') {
   return `${process.env.API_URL || 'http://localhost:4000'}/uploads/${name}`;
 }
 
+// Beri tahu pembaca yang menyimpan novel ini bahwa ada bab baru
+async function notifyReaders(novelId, chTitle, chNumber) {
+  const [[n]] = await db.query('SELECT title,publish_status FROM novels WHERE id=?', [novelId]);
+  if (!n || n.publish_status !== 'published') return;
+  await db.query('INSERT INTO notifications(user_id,message,link) SELECT user_id, ?, ? FROM library WHERE novel_id=?',
+    [`Bab baru di "${n.title}": ${chTitle}`, `/read/${novelId}/${chNumber}`, novelId]);
+}
+
 const novelSchema = z.object({ title: z.string().min(3, 'Judul minimal 3 karakter').max(150),
   synopsis: z.string().max(3000).default(''), tags: z.string().max(255).default(''),
   status: z.enum(['ongoing', 'completed']), type: z.enum(['novel', 'comic']).default('novel'), genreIds: z.array(z.number().int()).max(5, 'Maksimal 5 genre') });
@@ -94,11 +102,14 @@ r.post('/novels/:id/chapters', own, validate(chapterSchema), async (req, res) =>
   const b = req.body;
   const [[m]] = await db.query('SELECT COALESCE(MAX(number),0)+1 AS nx FROM chapters WHERE novel_id=?', [req.params.id]);
   const [i] = await db.query('INSERT INTO chapters(novel_id,number,title,content,status) VALUES(?,?,?,?,?)', [req.params.id, m.nx, b.title, b.content, b.status]);
+  if (b.status === 'published') await notifyReaders(req.params.id, b.title, m.nx);
   res.status(201).json({ id: i.insertId, number: m.nx });
 });
 r.put('/novels/:id/chapters/:chId', own, validate(chapterSchema), async (req, res) => {
   const b = req.body;
+  const [[old]] = await db.query('SELECT status,number FROM chapters WHERE id=? AND novel_id=?', [req.params.chId, req.params.id]);
   await db.query('UPDATE chapters SET title=?,content=?,status=? WHERE id=? AND novel_id=?', [b.title, b.content, b.status, req.params.chId, req.params.id]);
+  if (old && old.status !== 'published' && b.status === 'published') await notifyReaders(req.params.id, b.title, old.number);
   res.json({ ok: true });
 });
 r.delete('/novels/:id/chapters/:chId', own, async (req, res) => {
