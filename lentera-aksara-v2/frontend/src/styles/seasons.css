@@ -128,3 +128,28 @@ html[data-theme] .reader:not(.comic) p {
     border-radius: 6px;
   }
 }
+
+/* ==========================================================
+   Geser untuk pindah bab (efek membalik kertas)
+   ========================================================== */
+.flip-host { overflow-x: clip; }
+.flip-stage {
+  touch-action: pan-y;          /* scroll vertikal tetap normal, geser horizontal ditangani JS */
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.flip-stage.enter { animation: la-under .4s ease-out both; }
+@keyframes la-under {
+  from { opacity: 0; transform: scale(.97) translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.flip-stage .cpage { -webkit-user-drag: none; user-select: none; }
+.swipe-hint {
+  text-align: center;
+  font-size: .85rem;
+  color: var(--ink-soft);
+  margin: 4px 0 18px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .flip-stage.enter { animation: none; }
+}

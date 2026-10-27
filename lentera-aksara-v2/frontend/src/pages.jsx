@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { asset } from './asset.js';
 import { api } from './api.js';
@@ -100,6 +100,57 @@ export function Reader() {
   }, [user, c, id]);
   const mark = async () => { if (!user) return alert('Masuk dulu untuk memakai bookmark.');
     await api('/library/bookmarks/' + c.id, { method: bm ? 'DELETE' : 'POST' }); setBm(!bm); };
+  // ===== Geser untuk pindah bab (animasi membalik kertas) =====
+  const goNav = useNavigate();
+  const stage = useRef(null), drag = useRef(null), flipDir = useRef(null);
+  const reduce = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const origin = (el, dir) => { // poros putar di sisi kiri/kanan, setinggi tengah layar
+    const r = el.getBoundingClientRect();
+    const oy = Math.max(0, Math.min(r.height, window.innerHeight / 2 - r.top));
+    el.style.transformOrigin = (dir === 'next' ? 'left ' : 'right ') + oy + 'px';
+  };
+  const settle = () => { const el = stage.current; if (!el) return;
+    el.style.transition = 'transform .28s ease-out, opacity .28s ease-out, filter .28s ease-out';
+    el.style.transform = ''; el.style.opacity = ''; el.style.filter = ''; };
+  const turn = dir => {
+    const target = c && (dir === 'next' ? c.next : c.prev), el = stage.current;
+    if (!target) return settle();
+    flipDir.current = dir;
+    const to = () => goNav(`/read/${id}/${target}`);
+    if (!el || reduce) return to();
+    origin(el, dir);
+    el.style.transition = 'transform .34s ease-in, opacity .34s ease-in, filter .34s ease-in';
+    el.style.transform = `perspective(1800px) rotateY(${dir === 'next' ? -100 : 100}deg)`;
+    el.style.opacity = 0; el.style.filter = 'brightness(.85)';
+    setTimeout(to, 300);
+  };
+  const onDown = e => { if (e.pointerType === 'mouse' && e.button !== 0) return;
+    drag.current = { x: e.clientX, y: e.clientY, mode: null, dx: 0 }; };
+  const onMove = e => { const d = drag.current, el = stage.current; if (!d || !el) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (!d.mode) {
+      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+      d.mode = Math.abs(dx) > Math.abs(dy) * 1.4 ? 'h' : 'v';
+      if (d.mode === 'h') { el.setPointerCapture?.(e.pointerId); el.style.transition = 'none'; el.style.userSelect = 'none'; window.getSelection()?.removeAllRanges(); }
+    }
+    if (d.mode !== 'h' || reduce) return;
+    d.dx = dx;
+    const dir = dx < 0 ? 'next' : 'prev', ok = dir === 'next' ? c.next : c.prev;
+    const p = Math.min(1, Math.abs(dx) / ((el.offsetWidth || 1) * 0.7));
+    const ang = (ok ? 100 : 8) * p;
+    origin(el, dir);
+    el.style.transform = `perspective(1800px) rotateY(${dir === 'next' ? -ang : ang}deg)`;
+    el.style.opacity = 1 - (ok ? p * 0.5 : 0); el.style.filter = `brightness(${1 - p * 0.12})`; };
+  const onUp = () => { const d = drag.current, el = stage.current; drag.current = null;
+    if (!d || d.mode !== 'h' || !el) return;
+    el.style.userSelect = '';
+    if (Math.abs(d.dx) > Math.min(110, el.offsetWidth * 0.2)) turn(d.dx < 0 ? 'next' : 'prev'); else settle(); };
+  useEffect(() => {
+    const key = e => { if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (e.key === 'ArrowRight') turn('next'); else if (e.key === 'ArrowLeft') turn('prev'); };
+    window.addEventListener('keydown', key); return () => window.removeEventListener('keydown', key);
+  }, [c, id]);
+
   return (<State s={s}>{c && <>
     <div className="rbar card">
       <Link to={`/novel/${id}`}>← {c.novel_title}</Link>
@@ -107,12 +158,16 @@ export function Reader() {
         <button onClick={() => setLh(Math.max(1.4, +(lh - 0.2).toFixed(1)))}>☰−</button><button onClick={() => setLh(Math.min(2.6, +(lh + 0.2).toFixed(1)))}>☰+</button>
         <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀️' : '🌙'}</button>
         <button onClick={mark}>{bm ? '🔖' : '🏷️'}</button></span></div>
+    <div className="flip-host"><div ref={stage} className={'flip-stage' + (flipDir.current ? ' enter' : '')}
+      onAnimationEnd={() => { flipDir.current = null; }}
+      onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { drag.current = null; settle(); }}>
     <article className={'reader' + (c.pages?.length ? ' comic' : '')} style={{ '--fs': fs + 'px', '--lh': lh }}>
       <h2>Bab {c.number}: {c.title}</h2>
-      {c.pages?.length ? c.pages.map((u, i) => <img key={i} className="cpage" src={asset(u)} alt={`Halaman ${i + 1}`} loading="lazy" />) : (c.content || '').split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}</article>
+      {c.pages?.length ? c.pages.map((u, i) => <img key={i} className="cpage" src={asset(u)} alt={`Halaman ${i + 1}`} loading="lazy" />) : (c.content || '').split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}</article></div></div>
     <div className="pager">
       {c.prev ? <Link className="btn btn-dark" to={`/read/${id}/${c.prev}`}>← Sebelumnya</Link> : <span />}
       {c.next ? <Link className="btn btn-primary" to={`/read/${id}/${c.next}`}>Berikutnya →</Link> : <Link className="btn btn-dark" to={`/novel/${id}`}>Selesai</Link>}</div>
+    <p className="swipe-hint">Geser ke kiri atau kanan untuk pindah bab</p>
     <Comments chapterId={c.id} /></>}</State>);
 }
 
