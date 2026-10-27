@@ -205,16 +205,38 @@ export function Reader() {
   
 const [readProgress, setReadProgress] = useState(0);
 
+
+
 useEffect(() => {
+  let frameId;
+
   const updateProgress = () => {
-    const doc = document.documentElement;
-    const maxScroll = doc.scrollHeight - window.innerHeight;
+    cancelAnimationFrame(frameId);
 
-    const progress = maxScroll > 0
-      ? (window.scrollY / maxScroll) * 100
-      : 0;
+    frameId = requestAnimationFrame(() => {
+      const doc = document.documentElement;
+      const body = document.body;
 
-    setReadProgress(Math.min(100, Math.max(0, progress)));
+      const scrollTop = Math.max(
+        window.scrollY,
+        doc.scrollTop,
+        body.scrollTop
+      );
+
+      const pageHeight = Math.max(
+        doc.scrollHeight,
+        body.scrollHeight
+      );
+
+      const maxScroll = pageHeight - window.innerHeight;
+      const progress = maxScroll > 0
+        ? (scrollTop / maxScroll) * 100
+        : 0;
+
+      setReadProgress(
+        Math.min(100, Math.max(0, progress))
+      );
+    });
   };
 
   updateProgress();
@@ -222,10 +244,12 @@ useEffect(() => {
   window.addEventListener('resize', updateProgress);
 
   return () => {
+    cancelAnimationFrame(frameId);
     window.removeEventListener('scroll', updateProgress);
     window.removeEventListener('resize', updateProgress);
   };
 }, [id, num, c]);
+
 
   useEffect(() => { localStorage.la_fs = fs; localStorage.la_lh = lh; localStorage.la_paper = paper; localStorage.la_font = fontFamily; }, [fs, lh, paper, fontFamily]);
   useEffect(() => { window.scrollTo(0, 0); setBm(false); }, [num]);
