@@ -4,6 +4,7 @@ import { asset } from './asset.js';
 import { api } from './api.js';
 import { useApp } from './ctx.js';
 import { Comments } from './social.jsx';
+import './styles/App.css';
 
 function useFetch(path) {
   const [s, set] = useState({ loading: true });
