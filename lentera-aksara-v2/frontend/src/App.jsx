@@ -26,9 +26,7 @@ import {
 } from './pages.jsx';
 import { Bell, Notifications, Bookmarks, Profile } from './social.jsx';
 
-// Pertahankan latar musiman dan CSS yang sudah digunakan proyek.
-import FireBackground from './FireBackground.jsx';
-import IceBackground from './IceBackground.jsx';
+// Latar bergaya Fizzo Novel (CSS saja, tanpa canvas animasi).
 import './styles/seasons.css';
 
 export default function App() {
@@ -80,8 +78,6 @@ export default function App() {
 
   return (
     <AppCtx.Provider value={{ user, login, logout, theme, setTheme }}>
-      {theme === 'dark' ? <IceBackground /> : <FireBackground />}
-
       <header className="nav">
         <Link to="/" className="brand">
           <img src={asset('/LogoLA.jpeg')} alt="Lentera Aksara" />
