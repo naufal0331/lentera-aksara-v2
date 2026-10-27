@@ -90,3 +90,41 @@ html[data-theme] .card {
   box-shadow: var(--shadow);
 }
 html[data-theme] .card img { animation: none; box-shadow: none; }
+
+/* ==========================================================
+   Halaman baca: teks bab di atas "kertas" seperti halaman buku
+   (komik tidak ikut, karena isinya gambar)
+   ========================================================== */
+html[data-theme] .reader:not(.comic) {
+  box-sizing: border-box;
+  max-width: 860px;
+  margin: 24px auto 32px;
+  padding: 56px 72px 64px;
+  border-radius: 10px;
+}
+html[data-theme="light"] .reader:not(.comic) {
+  background: #ffffff;
+  color: #222222;
+  border: 1px solid #e8e4dc;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 10px 30px rgba(60, 40, 10, 0.08);
+}
+html[data-theme="dark"] .reader:not(.comic) {
+  background: #1d1d20;
+  color: #e6e6e6;
+  border: 1px solid #2c2c30;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+html[data-theme] .reader:not(.comic) h2,
+html[data-theme] .reader:not(.comic) p {
+  color: inherit;
+}
+
+@media (max-width: 720px) {
+  html[data-theme] .reader:not(.comic) {
+    margin: 12px 0 20px;
+    padding: 28px 20px 36px;
+    border-radius: 6px;
+  }
+}
