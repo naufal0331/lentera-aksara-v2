@@ -198,8 +198,10 @@ export function Reader() {
   const { id, num } = useParams(); const { user, theme, setTheme } = useApp();
   const s = useFetch(`/novels/${id}/chapters/${num}`); const c = s.data;
   const [fs, setFs] = useState(+localStorage.la_fs || 18); const [lh, setLh] = useState(+localStorage.la_lh || 1.9);
+  const [paper, setPaper] = useState(localStorage.la_paper || 'white');
+  const [fontFamily, setFontFamily] = useState(localStorage.la_font || 'serif');
   const [bm, setBm] = useState(false);
-  useEffect(() => { localStorage.la_fs = fs; localStorage.la_lh = lh; }, [fs, lh]);
+  useEffect(() => { localStorage.la_fs = fs; localStorage.la_lh = lh; localStorage.la_paper = paper; localStorage.la_font = fontFamily; }, [fs, lh, paper, fontFamily]);
   useEffect(() => { window.scrollTo(0, 0); setBm(false); }, [num]);
   useEffect(() => { if (user && c) api('/library/bookmarks').then(l => setBm(l.some(b => b.chapter_id === c.id))).catch(() => {}); }, [user, c]);
   useEffect(() => {
@@ -271,11 +273,28 @@ export function Reader() {
         <button onClick={() => setLh(Math.max(1.4, +(lh - 0.2).toFixed(1)))}>☰−</button><button onClick={() => setLh(Math.min(2.6, +(lh + 0.2).toFixed(1)))}>☰+</button>
         <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀️' : '🌙'}</button>
         <button onClick={mark}>{bm ? '🔖' : '🏷️'}</button></span></div>
-    {!c.pages?.length && <TextToSpeech text={c.content || ''} />}
+    {!c.pages?.length && <><div className="reader-options card">
+      <label>Warna kertas
+        <select value={paper} onChange={e => setPaper(e.target.value)} aria-label="Warna kertas">
+          <option value="white">Putih</option>
+          <option value="sepia">Krem / Sepia</option>
+          <option value="dark">Gelap</option>
+        </select>
+      </label>
+      <label>Jenis huruf
+        <select value={fontFamily} onChange={e => setFontFamily(e.target.value)} aria-label="Jenis huruf">
+          <option value="serif">Serif (buku)</option>
+          <option value="sans-serif">Sans-serif (modern)</option>
+          <option value="georgia">Georgia</option>
+          <option value="literata">Literata (jika tersedia)</option>
+          <option value="monospace">Monospace</option>
+        </select>
+      </label>
+    </div><TextToSpeech text={c.content || ''} /></>}
     <div className="flip-host"><div ref={stage} className={'flip-stage' + (flipDir.current ? ' enter' : '')}
       onAnimationEnd={() => { flipDir.current = null; }}
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { drag.current = null; settle(); }}>
-    <article className={'reader' + (c.pages?.length ? ' comic' : '')} style={{ '--fs': fs + 'px', '--lh': lh }}>
+    <article className={'reader' + (c.pages?.length ? ' comic' : ` paper-${paper}`)} style={{ '--fs': fs + 'px', '--lh': lh, fontFamily: fontFamily === 'georgia' ? 'Georgia, serif' : fontFamily === 'literata' ? 'Literata, Georgia, serif' : fontFamily }}> 
       <h2>Bab {c.number}: {c.title}</h2>
       {c.pages?.length ? c.pages.map((u, i) => <img key={i} className="cpage" src={asset(u)} alt={`Halaman ${i + 1}`} loading="lazy" />) : (c.content || '').split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}</article></div></div>
     <div className="pager">

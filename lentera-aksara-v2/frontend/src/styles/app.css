@@ -143,3 +143,73 @@ main{max-width:1100px;margin:auto;padding:1rem 1rem 5rem}
     flex: 1 1 auto;
   }
 }
+/* Pengaturan tampilan halaman baca novel Lentera Aksara */
+.reader-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+  margin: 12px auto;
+  padding: 12px 16px;
+}
+
+.reader-options label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.92rem;
+}
+
+.reader-options select {
+  max-width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line, #ddd);
+  border-radius: 8px;
+  background: var(--paper, #fff);
+  color: var(--ink, #222);
+  font: inherit;
+}
+
+/* Warna kertas */
+.reader.paper-white {
+  background: #ffffff !important;
+  color: #252525 !important;
+}
+.reader.paper-white h2,
+.reader.paper-white p {
+  color: #252525 !important;
+}
+
+.reader.paper-sepia {
+  background: #f4ead6 !important;
+  color: #493a2a !important;
+}
+.reader.paper-sepia h2,
+.reader.paper-sepia p {
+  color: #493a2a !important;
+}
+
+.reader.paper-dark {
+  background: #202124 !important;
+  color: #e8e2d8 !important;
+}
+.reader.paper-dark h2,
+.reader.paper-dark p {
+  color: #e8e2d8 !important;
+}
+
+@media (max-width: 600px) {
+  .reader-options {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .reader-options label {
+    justify-content: space-between;
+  }
+  .reader-options select {
+    flex: 1;
+    min-width: 130px;
+  }
+}
