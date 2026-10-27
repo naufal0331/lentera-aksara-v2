@@ -201,6 +201,31 @@ export function Reader() {
   const [paper, setPaper] = useState(localStorage.la_paper || 'white');
   const [fontFamily, setFontFamily] = useState(localStorage.la_font || 'serif');
   const [bm, setBm] = useState(false);
+  
+const [readProgress, setReadProgress] = useState(0);
+
+useEffect(() => {
+  const updateProgress = () => {
+    const doc = document.documentElement;
+    const maxScroll = doc.scrollHeight - window.innerHeight;
+
+    const progress = maxScroll > 0
+      ? (window.scrollY / maxScroll) * 100
+      : 0;
+
+    setReadProgress(Math.min(100, Math.max(0, progress)));
+  };
+
+  updateProgress();
+  window.addEventListener('scroll', updateProgress, { passive: true });
+  window.addEventListener('resize', updateProgress);
+
+  return () => {
+    window.removeEventListener('scroll', updateProgress);
+    window.removeEventListener('resize', updateProgress);
+  };
+}, [id, num, c]);
+
   useEffect(() => { localStorage.la_fs = fs; localStorage.la_lh = lh; localStorage.la_paper = paper; localStorage.la_font = fontFamily; }, [fs, lh, paper, fontFamily]);
   useEffect(() => { window.scrollTo(0, 0); setBm(false); }, [num]);
   useEffect(() => { if (user && c) api('/library/bookmarks').then(l => setBm(l.some(b => b.chapter_id === c.id))).catch(() => {}); }, [user, c]);
@@ -267,6 +292,21 @@ export function Reader() {
   }, [c, id]);
 
   return (<State s={s}>{c && <>
+  
+<div
+  className="reading-progress"
+  role="progressbar"
+  aria-label="Progres membaca"
+  aria-valuemin={0}
+  aria-valuemax={100}
+  aria-valuenow={Math.round(readProgress)}
+>
+  <div
+    className="reading-progress-fill"
+    style={{ width: `${readProgress}%` }}
+  />
+</div>
+
     <div className="rbar card">
       <Link to={`/novel/${id}`}>← {c.novel_title}</Link>
       <span><button onClick={() => setFs(Math.max(14, fs - 2))}>A−</button><button onClick={() => setFs(Math.min(30, fs + 2))}>A+</button>
