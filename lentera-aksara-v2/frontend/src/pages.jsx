@@ -81,6 +81,119 @@ export function Novel() {
     </div></article>}</State>);
 }
 
+
+// Pembaca suara menggunakan Web Speech API bawaan browser.
+function TextToSpeech({ text = "" }) {
+  const [status, setStatus] = useState("idle");
+  const [rate, setRate] = useState(1);
+  const [voices, setVoices] = useState([]);
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+
+    const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
+    loadVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+
+    return () => {
+      window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  const play = () => {
+    if (!("speechSynthesis" in window)) {
+      alert("Browser ini belum mendukung fitur baca otomatis.");
+      return;
+    }
+
+    const content = String(text || "").trim();
+    if (!content) {
+      alert("Teks bab ini belum tersedia untuk dibacakan.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(content);
+    const voice = voices.find(v => v.lang.toLowerCase() === "id-id")
+      || voices.find(v => v.lang.toLowerCase().startsWith("id"));
+
+    utterance.lang = "id-ID";
+    if (voice) utterance.voice = voice;
+    utterance.rate = rate;
+    utterance.pitch = 1;
+    utterance.onstart = () => setStatus("playing");
+    utterance.onend = () => setStatus("idle");
+    utterance.onerror = () => setStatus("idle");
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const pause = () => {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.pause();
+    setStatus("paused");
+  };
+
+  const resume = () => {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.resume();
+    setStatus("playing");
+  };
+
+  const stop = () => {
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    setStatus("idle");
+  };
+
+  if (!("speechSynthesis" in window)) {
+    return <p className="state">Browser ini belum mendukung baca otomatis.</p>;
+  }
+
+  return (
+    <section className="tts-player" aria-label="Kontrol baca otomatis">
+      <div className="tts-title">🔊 Baca Otomatis</div>
+      <div className="tts-controls">
+        <button type="button" onClick={play} disabled={status === "playing"}>
+          ▶ Putar
+        </button>
+        <button
+          type="button"
+          onClick={status === "paused" ? resume : pause}
+          disabled={status === "idle"}
+        >
+          {status === "paused" ? "▶ Lanjutkan" : "⏸ Jeda"}
+        </button>
+        <button type="button" onClick={stop} disabled={status === "idle"}>
+          ⏹ Berhenti
+        </button>
+      </div>
+      <label className="tts-speed">
+        Kecepatan baca
+        <select
+          value={rate}
+          onChange={e => setRate(Number(e.target.value))}
+          aria-label="Kecepatan baca"
+        >
+          <option value="0.7">Lambat (0,7x)</option>
+          <option value="1">Normal (1x)</option>
+          <option value="1.2">Agak cepat (1,2x)</option>
+          <option value="1.5">Cepat (1,5x)</option>
+        </select>
+      </label>
+      <small aria-live="polite">
+        {status === "playing"
+          ? "Sedang membacakan bab ini…"
+          : status === "paused"
+          ? "Pembacaan dijeda."
+          : "Tekan Putar untuk mendengarkan bab ini."}
+        {!voices.some(v => v.lang.toLowerCase().startsWith("id")) &&
+          " Suara Bahasa Indonesia mungkin belum tersedia di perangkat."}
+      </small>
+    </section>
+  );
+}
+
 export function Reader() {
   const { id, num } = useParams(); const { user, theme, setTheme } = useApp();
   const s = useFetch(`/novels/${id}/chapters/${num}`); const c = s.data;
@@ -158,6 +271,7 @@ export function Reader() {
         <button onClick={() => setLh(Math.max(1.4, +(lh - 0.2).toFixed(1)))}>☰−</button><button onClick={() => setLh(Math.min(2.6, +(lh + 0.2).toFixed(1)))}>☰+</button>
         <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀️' : '🌙'}</button>
         <button onClick={mark}>{bm ? '🔖' : '🏷️'}</button></span></div>
+    {!c.pages?.length && <TextToSpeech text={c.content || ''} />}
     <div className="flip-host"><div ref={stage} className={'flip-stage' + (flipDir.current ? ' enter' : '')}
       onAnimationEnd={() => { flipDir.current = null; }}
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { drag.current = null; settle(); }}>
