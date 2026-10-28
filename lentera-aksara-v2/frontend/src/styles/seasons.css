@@ -166,3 +166,44 @@ html[data-theme] .rbar { z-index: 9; }
 .autosave { color: var(--ink-soft); }
 .autosave.saved { color: var(--teal); }
 .autosave.error { color: #d64545; }
+
+/* ==========================================================
+   Lanjutkan membaca, rating, ikuti penulis, daftar bab
+   ========================================================== */
+.resume {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 16px; margin: 12px 0 18px;
+  color: var(--ink); text-decoration: none;
+}
+.resume img { width: 48px; height: 64px; object-fit: cover; border-radius: 6px; flex: none; }
+.resume > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.resume b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resume small { color: var(--ink-soft); }
+
+.engage { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 12px 0; }
+.rating { display: flex; flex-direction: column; gap: 2px; }
+.stars { display: flex; gap: 2px; }
+.star {
+  background: none; border: none; padding: 0 2px; cursor: pointer;
+  font-size: 1.7rem; line-height: 1; color: var(--ink-soft); opacity: .35;
+}
+.star.on { color: var(--mustard); opacity: 1; }
+.star.on.mine { color: var(--coral); }
+.rating .err, .follow .err { color: #d64545; }
+.follow small { color: var(--ink-soft); }
+
+.toc-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 1000; }
+.toc-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(380px, 92vw);
+  background: var(--paper); color: var(--ink); z-index: 1001;
+  display: flex; flex-direction: column; box-shadow: var(--shadow);
+  padding-top: env(safe-area-inset-top, 0px);
+  animation: la-toc .22s ease-out;
+}
+.toc-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.toc-list { list-style: none; margin: 0; padding: 6px 0; overflow-y: auto; flex: 1; }
+.toc-list a { display: block; padding: 10px 16px; color: inherit; text-decoration: none; }
+.toc-list a:hover { background: var(--cream); }
+.toc-list a.on { color: var(--coral); font-weight: 600; }
+@keyframes la-toc { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .toc-panel { animation: none; } }

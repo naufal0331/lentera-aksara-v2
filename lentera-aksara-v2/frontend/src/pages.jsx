@@ -4,7 +4,7 @@ import { asset } from './asset.js';
 import { api } from './api.js';
 import { useApp } from './ctx.js';
 import { Comments } from './social.jsx';
-import './styles/app.css';
+import { RatingBox, FollowButton, useRatings } from './engage.jsx';
 
 function useFetch(path) {
   const [s, set] = useState({ loading: true });
@@ -14,13 +14,13 @@ function useFetch(path) {
 const State = ({ s, empty, children }) => s.loading ? <p className="state">Memuat…</p> : s.error ? <p className="state err">{s.error}</p> : empty ? <p className="state">Belum ada novel yang cocok.</p> : children;
 const label = st => st === 'completed' ? 'Tamat' : 'Berlanjut';
 
-export const NovelCard = ({ n }) => (
+export const NovelCard = ({ n, rating }) => (
   <Link to={`/novel/${n.id}`} className="ncard card">
     <img className="cover" src={asset(n.cover_url)} alt={n.title} loading="lazy" />
     <div className="ninfo"><b>{n.title}</b><small>{n.author}</small><small>{n.genres}</small>
-      <div className="row">{n.type === 'comic' && <span className="badge ongoing">Komik</span>}<span className={'badge ' + n.status}>{label(n.status)}</span>{n.views != null && <small>👁 {n.views.toLocaleString('id-ID')}</small>}</div></div>
+      <div className="row">{n.type === 'comic' && <span className="badge ongoing">Komik</span>}<span className={'badge ' + n.status}>{label(n.status)}</span>{n.views != null && <small>👁 {n.views.toLocaleString('id-ID')}</small>}{rating?.n > 0 && <small>⭐ {rating.avg.toFixed(1)}</small>}</div></div>
   </Link>);
-const Grid = ({ items }) => <div className="grid">{items.map(n => <NovelCard key={n.id} n={n} />)}</div>;
+const Grid = ({ items }) => { const rt = useRatings(items); return <div className="grid">{items.map(n => <NovelCard key={n.id} n={n} rating={rt[n.id]} />)}</div>; };
 
 function Hero({ items }) {
   const [i, setI] = useState(0);
@@ -37,6 +37,12 @@ function Hero({ items }) {
 
 export function Home() {
   const [sp, setSp] = useSearchParams();
+  const { user } = useApp();
+  const [cont, setCont] = useState(null); // bacaan terakhir pengguna
+  useEffect(() => {
+    if (!user) { setCont(null); return; }
+    api('/library/history').then(l => setCont(Array.isArray(l) ? l[0] || null : null)).catch(() => {});
+  }, [user?.id]);
   const q = sp.get('q') || '', genre = sp.get('genre') || '', type = sp.get('type') || '';
   const genres = useFetch('/novels/genres');
   const qs = new URLSearchParams({ ...(q && { q }), ...(genre && { genre }), ...(type && { type }) }).toString();
@@ -46,6 +52,10 @@ export function Home() {
   const pick = g => { const p = {}; if (q) p.q = q; if (g) p.genre = g; if (type) p.type = type; setSp(p); };
   const top = pop.data?.items?.[0];
   return (<>
+    {!q && !genre && !type && cont && <Link className="resume card" to={`/read/${cont.novel_id}/${cont.chapter_number}?p=${Math.round(cont.scroll_pct || 0)}`}>
+      {cont.cover_url && <img src={asset(cont.cover_url)} alt="" />}
+      <div><small>Lanjutkan membaca</small><b>{cont.title}</b><small>Bab {cont.chapter_number} · {Math.round(cont.scroll_pct || 0)}% dibaca</small></div>
+      <span className="btn btn-primary">Lanjutkan</span></Link>}
     {!q && !genre && !type && pop.data?.items?.length > 0 && <Hero items={pop.data.items.slice(0, 5)} />}
     <div className="chips">{[['', 'Semua'], ['novel', '📖 Novel'], ['comic', '🎨 Komik']].map(([v, l]) => <button key={v} className={type === v ? 'on' : ''} onClick={() => { const p = {}; if (q) p.q = q; if (genre) p.genre = genre; if (v) p.type = v; setSp(p); }}>{l}</button>)}</div>
     <div className="chips">
@@ -73,6 +83,7 @@ export function Novel() {
     <img className="cover big" src={asset(n.cover_url)} alt={n.title} />
     <div><h1>{n.title}</h1><p className="muted">oleh {n.author} · {n.genres}</p>
       <span className={'badge ' + n.status}>{label(n.status)}</span> <small>👁 {n.views.toLocaleString('id-ID')} pembaca</small>
+      <div className="engage"><RatingBox novelId={n.id} /><FollowButton novelId={n.id} /></div>
       <p className="syn">{n.synopsis}</p>
       <div className="row">{n.chapters[0] && <Link className="btn btn-primary" to={`/read/${n.id}/${n.chapters[0].number}`}>Mulai Membaca</Link>}
         <button className="btn btn-dark" onClick={toggle}>{saved ? '✓ Tersimpan' : '+ Simpan ke Perpustakaan'}</button><button className="icon" onClick={report}>🚩 Laporkan</button></div>
@@ -82,176 +93,14 @@ export function Novel() {
     </div></article>}</State>);
 }
 
-
-// Pembaca suara menggunakan Web Speech API bawaan browser.
-function TextToSpeech({ text = "" }) {
-  const [status, setStatus] = useState("idle");
-  const [rate, setRate] = useState(1);
-  const [voices, setVoices] = useState([]);
-
-  useEffect(() => {
-    if (!("speechSynthesis" in window)) return;
-
-    const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
-    loadVoices();
-    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
-
-    return () => {
-      window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
-      window.speechSynthesis.cancel();
-    };
-  }, []);
-
-  const play = () => {
-    if (!("speechSynthesis" in window)) {
-      alert("Browser ini belum mendukung fitur baca otomatis.");
-      return;
-    }
-
-    const content = String(text || "").trim();
-    if (!content) {
-      alert("Teks bab ini belum tersedia untuk dibacakan.");
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(content);
-    const voice = voices.find(v => v.lang.toLowerCase() === "id-id")
-      || voices.find(v => v.lang.toLowerCase().startsWith("id"));
-
-    utterance.lang = "id-ID";
-    if (voice) utterance.voice = voice;
-    utterance.rate = rate;
-    utterance.pitch = 1;
-    utterance.onstart = () => setStatus("playing");
-    utterance.onend = () => setStatus("idle");
-    utterance.onerror = () => setStatus("idle");
-
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const pause = () => {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.pause();
-    setStatus("paused");
-  };
-
-  const resume = () => {
-    if (!("speechSynthesis" in window)) return;
-    window.speechSynthesis.resume();
-    setStatus("playing");
-  };
-
-  const stop = () => {
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    setStatus("idle");
-  };
-
-  if (!("speechSynthesis" in window)) {
-    return <p className="state">Browser ini belum mendukung baca otomatis.</p>;
-  }
-
-  return (
-    <section className="tts-player" aria-label="Kontrol baca otomatis">
-      <div className="tts-title">🔊 Baca Otomatis</div>
-      <div className="tts-controls">
-        <button type="button" onClick={play} disabled={status === "playing"}>
-          ▶ Putar
-        </button>
-        <button
-          type="button"
-          onClick={status === "paused" ? resume : pause}
-          disabled={status === "idle"}
-        >
-          {status === "paused" ? "▶ Lanjutkan" : "⏸ Jeda"}
-        </button>
-        <button type="button" onClick={stop} disabled={status === "idle"}>
-          ⏹ Berhenti
-        </button>
-      </div>
-      <label className="tts-speed">
-        Kecepatan baca
-        <select
-          value={rate}
-          onChange={e => setRate(Number(e.target.value))}
-          aria-label="Kecepatan baca"
-        >
-          <option value="0.7">Lambat (0,7x)</option>
-          <option value="1">Normal (1x)</option>
-          <option value="1.2">Agak cepat (1,2x)</option>
-          <option value="1.5">Cepat (1,5x)</option>
-        </select>
-      </label>
-      <small aria-live="polite">
-        {status === "playing"
-          ? "Sedang membacakan bab ini…"
-          : status === "paused"
-          ? "Pembacaan dijeda."
-          : "Tekan Putar untuk mendengarkan bab ini."}
-        {!voices.some(v => v.lang.toLowerCase().startsWith("id")) &&
-          " Suara Bahasa Indonesia mungkin belum tersedia di perangkat."}
-      </small>
-    </section>
-  );
-}
-
 export function Reader() {
   const { id, num } = useParams(); const { user, theme, setTheme } = useApp();
+  const [rsp, setRsp] = useSearchParams(); const resumeP = rsp.get('p'); // ?p=persen dari kartu "Lanjutkan membaca"
+  const [tocOpen, setTocOpen] = useState(false); const [chapters, setChapters] = useState(null);
   const s = useFetch(`/novels/${id}/chapters/${num}`); const c = s.data;
   const [fs, setFs] = useState(+localStorage.la_fs || 18); const [lh, setLh] = useState(+localStorage.la_lh || 1.9);
-  const [paper, setPaper] = useState(localStorage.la_paper || 'white');
-  const [fontFamily, setFontFamily] = useState(localStorage.la_font || 'serif');
   const [bm, setBm] = useState(false);
-  
-const [readProgress, setReadProgress] = useState(0);
-
-
-
-useEffect(() => {
-  let frameId;
-
-  const updateProgress = () => {
-    cancelAnimationFrame(frameId);
-
-    frameId = requestAnimationFrame(() => {
-      const doc = document.documentElement;
-      const body = document.body;
-
-      const scrollTop = Math.max(
-        window.scrollY,
-        doc.scrollTop,
-        body.scrollTop
-      );
-
-      const pageHeight = Math.max(
-        doc.scrollHeight,
-        body.scrollHeight
-      );
-
-      const maxScroll = pageHeight - window.innerHeight;
-      const progress = maxScroll > 0
-        ? (scrollTop / maxScroll) * 100
-        : 0;
-
-      setReadProgress(
-        Math.min(100, Math.max(0, progress))
-      );
-    });
-  };
-
-  updateProgress();
-  window.addEventListener('scroll', updateProgress, { passive: true });
-  window.addEventListener('resize', updateProgress);
-
-  return () => {
-    cancelAnimationFrame(frameId);
-    window.removeEventListener('scroll', updateProgress);
-    window.removeEventListener('resize', updateProgress);
-  };
-}, [id, num, c]);
-
-
-  useEffect(() => { localStorage.la_fs = fs; localStorage.la_lh = lh; localStorage.la_paper = paper; localStorage.la_font = fontFamily; }, [fs, lh, paper, fontFamily]);
+  useEffect(() => { localStorage.la_fs = fs; localStorage.la_lh = lh; }, [fs, lh]);
   useEffect(() => { window.scrollTo(0, 0); setBm(false); }, [num]);
   useEffect(() => { if (user && c) api('/library/bookmarks').then(l => setBm(l.some(b => b.chapter_id === c.id))).catch(() => {}); }, [user, c]);
   useEffect(() => {
@@ -260,11 +109,35 @@ useEffect(() => {
       const p = (h.scrollTop / Math.max(1, h.scrollHeight - h.clientHeight)) * 100;
       api('/library/progress', { method: 'PUT', body: { novelId: +id, chapterId: c.id, scrollPct: Math.min(100, p) } }).catch(() => {}); };
     const on = () => { clearTimeout(t); t = setTimeout(send, 1200); };
-    send(); window.addEventListener('scroll', on);
+    if (resumeP == null) send(); // jangan menimpa progres tersimpan dengan 0% saat melanjutkan
+    window.addEventListener('scroll', on);
     return () => { clearTimeout(t); window.removeEventListener('scroll', on); };
   }, [user, c, id]);
   const mark = async () => { if (!user) return alert('Masuk dulu untuk memakai bookmark.');
     await api('/library/bookmarks/' + c.id, { method: bm ? 'DELETE' : 'POST' }); setBm(!bm); };
+  // Lanjut ke posisi terakhir dibaca
+  useEffect(() => {
+    if (!c || resumeP == null) return;
+    const pct = Math.max(0, Math.min(100, +resumeP || 0));
+    const t = setTimeout(() => {
+      const h = document.documentElement;
+      window.scrollTo(0, (h.scrollHeight - h.clientHeight) * pct / 100);
+      setRsp({}, { replace: true });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [c?.id]);
+
+  // Daftar bab (panel samping)
+  useEffect(() => { setTocOpen(false); }, [num]);
+  useEffect(() => { setChapters(null); }, [id]);
+  useEffect(() => {
+    if (!tocOpen) return; let ok = true;
+    api('/novels/' + id).then(n => ok && setChapters(n.chapters || [])).catch(() => ok && setChapters([]));
+    const esc = e => { if (e.key === 'Escape') setTocOpen(false); };
+    window.addEventListener('keydown', esc);
+    return () => { ok = false; window.removeEventListener('keydown', esc); };
+  }, [tocOpen, id]);
+
   // ===== Geser untuk pindah bab (animasi membalik kertas) =====
   const goNav = useNavigate();
   const stage = useRef(null), drag = useRef(null), flipDir = useRef(null);
@@ -317,49 +190,25 @@ useEffect(() => {
   }, [c, id]);
 
   return (<State s={s}>{c && <>
-  
-<div
-  className="reading-progress"
-  role="progressbar"
-  aria-label="Progres membaca"
-  aria-valuemin={0}
-  aria-valuemax={100}
-  aria-valuenow={Math.round(readProgress)}
->
-  <div
-    className="reading-progress-fill"
-    style={{ width: `${readProgress}%` }}
-  />
-</div>
-
     <div className="rbar card">
       <Link to={`/novel/${id}`}>← {c.novel_title}</Link>
       <span><button onClick={() => setFs(Math.max(14, fs - 2))}>A−</button><button onClick={() => setFs(Math.min(30, fs + 2))}>A+</button>
         <button onClick={() => setLh(Math.max(1.4, +(lh - 0.2).toFixed(1)))}>☰−</button><button onClick={() => setLh(Math.min(2.6, +(lh + 0.2).toFixed(1)))}>☰+</button>
         <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀️' : '🌙'}</button>
+        <button onClick={() => setTocOpen(o => !o)} aria-label="Daftar bab" title="Daftar bab">📑</button>
         <button onClick={mark}>{bm ? '🔖' : '🏷️'}</button></span></div>
-    {!c.pages?.length && <><div className="reader-options card">
-      <label>Warna kertas
-        <select value={paper} onChange={e => setPaper(e.target.value)} aria-label="Warna kertas">
-          <option value="white">Putih</option>
-          <option value="sepia">Krem / Sepia</option>
-          <option value="dark">Gelap</option>
-        </select>
-      </label>
-      <label>Jenis huruf
-        <select value={fontFamily} onChange={e => setFontFamily(e.target.value)} aria-label="Jenis huruf">
-          <option value="serif">Serif (buku)</option>
-          <option value="sans-serif">Sans-serif (modern)</option>
-          <option value="georgia">Georgia</option>
-          <option value="literata">Literata (jika tersedia)</option>
-          <option value="monospace">Monospace</option>
-        </select>
-      </label>
-    </div><TextToSpeech text={c.content || ''} /></>}
+    {tocOpen && <>
+      <div className="toc-backdrop" onClick={() => setTocOpen(false)} />
+      <aside className="toc-panel" role="dialog" aria-label="Daftar bab">
+        <div className="toc-head"><b>Daftar Bab</b><button className="icon" onClick={() => setTocOpen(false)} aria-label="Tutup">✕</button></div>
+        {chapters === null ? <p className="state">Memuat…</p> : chapters.length === 0 ? <p className="state">Belum ada bab.</p> :
+          <ul className="toc-list">{chapters.map(x => <li key={x.id}>
+            <Link className={+x.number === +num ? 'on' : ''} to={`/read/${id}/${x.number}`} onClick={() => setTocOpen(false)}>Bab {x.number} — {x.title}</Link></li>)}</ul>}
+      </aside></>}
     <div className="flip-host"><div ref={stage} className={'flip-stage' + (flipDir.current ? ' enter' : '')}
       onAnimationEnd={() => { flipDir.current = null; }}
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { drag.current = null; settle(); }}>
-    <article className={'reader' + (c.pages?.length ? ' comic' : ` paper-${paper}`)} style={{ '--fs': fs + 'px', '--lh': lh, fontFamily: fontFamily === 'georgia' ? 'Georgia, serif' : fontFamily === 'literata' ? 'Literata, Georgia, serif' : fontFamily }}> 
+    <article className={'reader' + (c.pages?.length ? ' comic' : '')} style={{ '--fs': fs + 'px', '--lh': lh }}>
       <h2>Bab {c.number}: {c.title}</h2>
       {c.pages?.length ? c.pages.map((u, i) => <img key={i} className="cpage" src={asset(u)} alt={`Halaman ${i + 1}`} loading="lazy" />) : (c.content || '').split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}</article></div></div>
     <div className="pager">

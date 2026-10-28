@@ -13,10 +13,12 @@ export async function publishDue() {
     const [u] = await db.query(
       "UPDATE chapters SET status='published', publish_at=NULL WHERE id=? AND status='draft' AND publish_at IS NOT NULL AND publish_at<=?", [c.id, now]);
     if (u.affectedRows !== 1) continue;
-    const [[n]] = await db.query('SELECT title,publish_status FROM novels WHERE id=?', [c.novel_id]);
+    const [[n]] = await db.query('SELECT title,publish_status,author_id FROM novels WHERE id=?', [c.novel_id]);
     if (!n || n.publish_status !== 'published') continue;
-    await db.query('INSERT INTO notifications(user_id,message,link) SELECT user_id, ?, ? FROM library WHERE novel_id=?',
-      [`Bab baru di "${n.title}": ${c.title}`, `/read/${c.novel_id}/${c.number}`, c.novel_id]);
+    await db.query(`INSERT INTO notifications(user_id,message,link)
+      SELECT t.user_id, ?, ? FROM (SELECT user_id FROM library WHERE novel_id=? UNION SELECT user_id FROM author_follows WHERE author_id=?) t
+      WHERE t.user_id <> ?`,
+      [`Bab baru di "${n.title}": ${c.title}`, `/read/${c.novel_id}/${c.number}`, c.novel_id, n.author_id, n.author_id]);
   }
   return due.length;
 }

@@ -27,10 +27,13 @@ async function saveCover(file, sub = 'covers') {
 
 // Beri tahu pembaca yang menyimpan novel ini bahwa ada bab baru
 async function notifyReaders(novelId, chTitle, chNumber) {
-  const [[n]] = await db.query('SELECT title,publish_status FROM novels WHERE id=?', [novelId]);
+  const [[n]] = await db.query('SELECT title,publish_status,author_id FROM novels WHERE id=?', [novelId]);
   if (!n || n.publish_status !== 'published') return;
-  await db.query('INSERT INTO notifications(user_id,message,link) SELECT user_id, ?, ? FROM library WHERE novel_id=?',
-    [`Bab baru di "${n.title}": ${chTitle}`, `/read/${novelId}/${chNumber}`, novelId]);
+  // Pembaca yang menyimpan novel ini ATAU mengikuti penulisnya (UNION menghapus duplikat), kecuali penulis sendiri
+  await db.query(`INSERT INTO notifications(user_id,message,link)
+    SELECT t.user_id, ?, ? FROM (SELECT user_id FROM library WHERE novel_id=? UNION SELECT user_id FROM author_follows WHERE author_id=?) t
+    WHERE t.user_id <> ?`,
+    [`Bab baru di "${n.title}": ${chTitle}`, `/read/${novelId}/${chNumber}`, novelId, n.author_id, n.author_id]);
 }
 
 const novelSchema = z.object({ title: z.string().min(3, 'Judul minimal 3 karakter').max(150),
@@ -96,7 +99,7 @@ r.post('/novels/:id/submit', own, async (req, res) => {
   res.json({ publish_status: st, message: st === 'published' ? 'Novel sudah terbit.' : 'Novel dikirim, menunggu moderasi admin.' });
 });
 
-r.delete('/novels/:id', own, async (req, res) => { await db.query('DELETE FROM novels WHERE id=?', [req.params.id]); res.json({ ok: true }); });
+r.delete('/novels/:id', own, async (req, res) => { await db.query('DELETE FROM novel_ratings WHERE novel_id=?', [req.params.id]); await db.query('DELETE FROM novels WHERE id=?', [req.params.id]); res.json({ ok: true }); });
 
 r.get('/novels/:id/chapters/:chId', own, async (req, res) => {
   const [[c]] = await db.query('SELECT id,number,title,content,status,publish_at FROM chapters WHERE id=? AND novel_id=?', [req.params.chId, req.params.id]);
