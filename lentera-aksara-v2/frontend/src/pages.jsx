@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { asset } from './asset.js';
 import { api } from './api.js';
@@ -197,14 +198,14 @@ export function Reader() {
         <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀️' : '🌙'}</button>
         <button onClick={() => setTocOpen(o => !o)} aria-label="Daftar bab" title="Daftar bab">📑</button>
         <button onClick={mark}>{bm ? '🔖' : '🏷️'}</button></span></div>
-    {tocOpen && <>
+    {tocOpen && createPortal(<>
       <div className="toc-backdrop" onClick={() => setTocOpen(false)} />
       <aside className="toc-panel" role="dialog" aria-label="Daftar bab">
         <div className="toc-head"><b>Daftar Bab</b><button className="icon" onClick={() => setTocOpen(false)} aria-label="Tutup">✕</button></div>
         {chapters === null ? <p className="state">Memuat…</p> : chapters.length === 0 ? <p className="state">Belum ada bab.</p> :
           <ul className="toc-list">{chapters.map(x => <li key={x.id}>
             <Link className={+x.number === +num ? 'on' : ''} to={`/read/${id}/${x.number}`} onClick={() => setTocOpen(false)}>Bab {x.number} — {x.title}</Link></li>)}</ul>}
-      </aside></>}
+      </aside></>, document.body)}
     <div className="flip-host"><div ref={stage} className={'flip-stage' + (flipDir.current ? ' enter' : '')}
       onAnimationEnd={() => { flipDir.current = null; }}
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { drag.current = null; settle(); }}>
