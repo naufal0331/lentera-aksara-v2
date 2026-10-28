@@ -3,21 +3,36 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { db } from '../db.js';
 import { auth, validate } from '../middleware.js';
+import { publishDueMiddleware } from '../publishDue.js';
 const r = Router();
 const A = fn => (q, s, n) => Promise.resolve(fn(q, s, n)).catch(n);
+r.use(publishDueMiddleware);
 
 // ---- Komentar (baca: publik, tulis: harus login) ----
 r.get('/comments/:chapterId', A(async (req, res) => res.json((await db.query(
-  `SELECT m.id,m.body,m.created_at,m.user_id,u.username FROM comments m JOIN users u ON u.id=m.user_id
+  `SELECT m.id,m.body,m.created_at,m.user_id,m.parent_id,u.username,n.author_id,(m.user_id=n.author_id) AS is_author FROM comments m JOIN users u ON u.id=m.user_id
    JOIN chapters c ON c.id=m.chapter_id JOIN novels n ON n.id=c.novel_id
    WHERE m.chapter_id=? AND n.publish_status='published' ORDER BY m.id DESC LIMIT 100`, [req.params.chapterId]))[0])));
 
 r.post('/comments/:chapterId', auth, rateLimit({ windowMs: 60000, max: 15 }),
-  validate(z.object({ body: z.string().trim().min(1, 'Komentar tidak boleh kosong').max(1000, 'Komentar maksimal 1000 karakter') })),
+  validate(z.object({ body: z.string().trim().min(1, 'Komentar tidak boleh kosong').max(1000, 'Komentar maksimal 1000 karakter'),
+    parentId: z.number().int().positive().optional() })),
   A(async (req, res) => {
     const [[c]] = await db.query(`SELECT c.id,c.number,n.id AS novel_id,n.title AS novel_title,n.author_id FROM chapters c
       JOIN novels n ON n.id=c.novel_id WHERE c.id=? AND c.status='published' AND n.publish_status='published'`, [req.params.chapterId]);
     if (!c) return res.status(404).json({ error: 'Bab tidak ditemukan.' });
+    // Balasan: hanya penulis novel (atau admin), satu tingkat, ke komentar utama di bab yang sama
+    if (req.body.parentId) {
+      if (c.author_id !== req.user.id && req.user.role !== 'admin')
+        return res.status(403).json({ error: 'Hanya penulis yang dapat membalas komentar.' });
+      const [[p]] = await db.query('SELECT id,user_id FROM comments WHERE id=? AND chapter_id=? AND parent_id IS NULL', [req.body.parentId, c.id]);
+      if (!p) return res.status(404).json({ error: 'Komentar yang dibalas tidak ditemukan.' });
+      await db.query('INSERT INTO comments(user_id,chapter_id,body,parent_id) VALUES(?,?,?,?)', [req.user.id, c.id, req.body.body, p.id]);
+      if (p.user_id !== req.user.id)
+        await db.query('INSERT INTO notifications(user_id,message,link) VALUES(?,?,?)',
+          [p.user_id, `Penulis membalas komentarmu di "${c.novel_title}" bab ${c.number}`, `/read/${c.novel_id}/${c.number}`]);
+      return res.status(201).json({ ok: true });
+    }
     await db.query('INSERT INTO comments(user_id,chapter_id,body) VALUES(?,?,?)', [req.user.id, c.id, req.body.body]);
     if (c.author_id !== req.user.id)
       await db.query('INSERT INTO notifications(user_id,message,link) VALUES(?,?,?)',
@@ -29,7 +44,7 @@ r.delete('/comments/:id', auth, A(async (req, res) => {
   const [[m]] = await db.query('SELECT user_id FROM comments WHERE id=?', [req.params.id]);
   if (!m) return res.status(404).json({ error: 'Komentar tidak ditemukan.' });
   if (m.user_id !== req.user.id && req.user.role !== 'admin') return res.status(403).json({ error: 'Akses ditolak.' });
-  await db.query('DELETE FROM comments WHERE id=?', [req.params.id]); res.json({ ok: true });
+  await db.query('DELETE FROM comments WHERE id=? OR parent_id=?', [req.params.id, req.params.id]); res.json({ ok: true });
 }));
 
 // ---- Notifikasi ----

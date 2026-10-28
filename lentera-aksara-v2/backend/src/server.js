@@ -9,9 +9,11 @@ import library from './routes/library.js';
 import author from './routes/author.js';
 import admin from './routes/admin.js';
 import social from './routes/social.js';
+import { publishDueMiddleware } from './publishDue.js';
 
 process.on('unhandledRejection', e => console.error('Unhandled:', e));
 const app = express();
+app.use('/api', publishDueMiddleware);
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: process.env.CLIENT_ORIGIN }));

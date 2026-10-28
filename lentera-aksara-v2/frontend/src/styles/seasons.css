@@ -153,3 +153,16 @@ html[data-theme] .reader:not(.comic) p {
 @media (prefers-reduced-motion: reduce) {
   .flip-stage.enter { animation: none; }
 }
+
+/* ==========================================================
+   Balasan komentar & indikator simpan otomatis
+   ========================================================== */
+.creplies {
+  margin: 6px 0 12px 22px;
+  padding-left: 14px;
+  border-left: 2px solid var(--line);
+}
+.comment.reply { margin-top: 8px; }
+.autosave { color: var(--ink-soft); }
+.autosave.saved { color: var(--teal); }
+.autosave.error { color: #d64545; }

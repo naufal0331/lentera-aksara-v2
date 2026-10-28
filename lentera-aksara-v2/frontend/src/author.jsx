@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Link,
   useParams,
@@ -16,6 +16,18 @@ const PUB = {
   published: 'Terbit',
   rejected: 'Ditolak'
 };
+
+const pad2 = n => String(n).padStart(2, '0');
+// ISO -> nilai <input type="datetime-local"> (waktu setempat)
+const toLocalInput = iso => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+const fmtWhen = v => new Date(v).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+// Mode penerbitan bab: draft | scheduled | published (diturunkan dari data server bila belum dipilih)
+const modeOf = c => c.mode || (c.status === 'published' ? 'published' : c.publish_at ? 'scheduled' : 'draft');
+const whenOf = c => c.when ?? toLocalInput(c.publish_at);
 
 export const Guard = ({ children }) => {
   const { user } = useApp();
@@ -321,43 +333,105 @@ export function NovelEditor() {
     });
   };
 
+  // ===== Simpan draf otomatis =====
+  const [auto, setAuto] = useState(''); const [autoAt, setAutoAt] = useState(null);
+  const chRef = useRef(null); chRef.current = ch;
+  const savedSnap = useRef(''); const busy = useRef(false);
+  const snapOf = c => JSON.stringify([c.title || '', c.content || '']);
+  const bkKey = c => `la_draft_${id}_${c?.id || 'new'}`;
+  const clearBackup = c => { try { localStorage.removeItem(bkKey(c)); localStorage.removeItem(`la_draft_${id}_new`); } catch {} };
+  const refreshChapters = async () => { try { setNovel(await api('/author/novels/' + id)); } catch {} };
+
+  const autosave = async () => {
+    if (busy.current) return;
+    const cur = chRef.current;
+    if (!cur || modeOf(cur) === 'published' || !cur.title?.trim() || snapOf(cur) === savedSnap.current) return;
+    busy.current = true; setAuto('saving');
+    try {
+      const snap = snapOf(cur);
+      if (cur.id) {
+        await api(`/author/novels/${id}/chapters/${cur.id}/autosave`, { method: 'PUT', body: { title: cur.title, content: cur.content || '' } });
+      } else {
+        const r = await api(`/author/novels/${id}/chapters`, { method: 'POST', body: { title: cur.title, content: cur.content || '', status: 'draft' } });
+        setCh(p => (p && !p.id ? { ...p, id: r.id, number: r.number } : p));
+        refreshChapters();
+      }
+      savedSnap.current = snap; clearBackup(cur);
+      setAuto('saved'); setAutoAt(new Date());
+    } catch { setAuto('error'); }
+    busy.current = false;
+    // jika pengguna masih mengetik selama proses simpan, simpan lagi
+    const c2 = chRef.current;
+    if (c2 && modeOf(c2) !== 'published' && c2.title?.trim() && snapOf(c2) !== savedSnap.current) setTimeout(autosave, 800);
+  };
+
+  const curMode = ch ? modeOf(ch) : null;
+  useEffect(() => {
+    if (!ch || novel?.type === 'comic' || snapOf(ch) === savedSnap.current) return;
+    const t1 = setTimeout(() => { // cadangan di perangkat ini
+      try { localStorage.setItem(bkKey(ch), JSON.stringify({ title: ch.title, content: ch.content || '', t: Date.now() })); } catch {}
+    }, 600);
+    if (curMode === 'published') { setAuto('local'); return () => clearTimeout(t1); }
+    if (!ch.title?.trim()) { setAuto('notitle'); return () => clearTimeout(t1); }
+    setAuto('pending');
+    const t2 = setTimeout(autosave, 2500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [ch?.title, ch?.content, curMode, novel?.type]);
+
   const openCh = c => run(async () => {
-    if (c) {
-      setCh(
-        await api(`/author/novels/${id}/chapters/${c.id}`)
-      );
-    } else {
-      setCh({
-        title: '',
-        content: '',
-        status: 'draft'
-      });
-    }
+    let data = c ? await api(`/author/novels/${id}/chapters/${c.id}`) : { title: '', content: '', status: 'draft' };
+    savedSnap.current = snapOf(data);
+    try { // pulihkan tulisan yang belum sempat tersimpan (mis. koneksi putus / tab tertutup)
+      const bk = JSON.parse(localStorage.getItem(bkKey(data)) || 'null');
+      if (bk && JSON.stringify([bk.title, bk.content]) !== savedSnap.current &&
+          confirm(`Ada tulisan yang belum tersimpan dari ${fmtWhen(bk.t)}. Pulihkan?`)) data = { ...data, title: bk.title, content: bk.content };
+      else if (bk) localStorage.removeItem(bkKey(data));
+    } catch {}
+    setAuto(''); setCh(data);
   });
 
   const saveCh = () => run(async () => {
-    if (!ch?.title?.trim()) {
+    while (busy.current) await new Promise(r => setTimeout(r, 150)); // tunggu simpan otomatis selesai
+    const cur = chRef.current;
+
+    if (!cur?.title?.trim()) {
       throw new Error('Judul bab atau episode wajib diisi.');
     }
 
+    const mode = modeOf(cur);
+    let status = mode === 'published' ? 'published' : 'draft';
+    let publishAt = null;
+
+    if (mode === 'scheduled') {
+      const d = new Date(whenOf(cur));
+      if (!whenOf(cur) || isNaN(d)) throw new Error('Pilih tanggal dan jam terbit.');
+      if (d <= new Date()) throw new Error('Waktu terbit harus di masa depan.');
+      publishAt = d.toISOString();
+    }
+
     const body = {
-      title: ch.title,
-      content: ch.content || '',
-      status: ch.status
+      title: cur.title,
+      content: cur.content || '',
+      status,
+      publishAt
     };
 
     const r = await api(
-      `/author/novels/${id}/chapters${ch.id ? '/' + ch.id : ''}`,
+      `/author/novels/${id}/chapters${cur.id ? '/' + cur.id : ''}`,
       {
-        method: ch.id ? 'PUT' : 'POST',
+        method: cur.id ? 'PUT' : 'POST',
         body
       }
     );
 
+    savedSnap.current = snapOf(cur);
+    clearBackup(cur);
+    setAuto('');
+
     await load();
 
     if (novel.type === 'comic') {
-      const chapterId = ch.id || r.id;
+      const chapterId = cur.id || r.id;
 
       setCh(
         await api(
@@ -366,11 +440,19 @@ export function NovelEditor() {
       );
 
       setMsg(
-        '✓ Episode tersimpan. Kamu dapat mengunggah halaman komik.'
+        mode === 'scheduled'
+          ? `✓ Episode dijadwalkan terbit ${fmtWhen(publishAt)}. Kamu dapat mengunggah halaman komik.`
+          : '✓ Episode tersimpan. Kamu dapat mengunggah halaman komik.'
       );
     } else {
       setCh(null);
-      setMsg('✓ Bab berhasil disimpan.');
+      setMsg(
+        mode === 'scheduled'
+          ? `✓ Bab dijadwalkan terbit ${fmtWhen(publishAt)}.`
+          : mode === 'published'
+            ? '✓ Bab berhasil diterbitkan.'
+            : '✓ Draf bab tersimpan.'
+      );
     }
   });
 
@@ -582,7 +664,11 @@ export function NovelEditor() {
                     {' '}{c.number} — {c.title}
                     {' '}
                     <span className="badge">
-                      {c.status === 'published' ? 'Terbit' : 'Draf'}
+                      {c.status === 'published'
+                        ? 'Terbit'
+                        : c.publish_at
+                          ? `Terjadwal · ${fmtWhen(c.publish_at)}`
+                          : 'Draf'}
                     </span>
                   </span>
 
@@ -677,14 +763,46 @@ export function NovelEditor() {
                 )}
 
                 <select
-                  value={ch.status}
+                  value={modeOf(ch)}
                   onChange={e =>
-                    setCh({ ...ch, status: e.target.value })
+                    setCh({ ...ch, mode: e.target.value })
                   }
                 >
                   <option value="draft">Simpan sebagai draf</option>
-                  <option value="published">Terbitkan bab/episode</option>
+                  <option value="scheduled">Jadwalkan terbit</option>
+                  <option value="published">Terbitkan sekarang</option>
                 </select>
+
+                {modeOf(ch) === 'scheduled' && (
+                  <label>
+                    Terbit pada{' '}
+                    <input
+                      type="datetime-local"
+                      value={whenOf(ch)}
+                      min={toLocalInput(new Date().toISOString())}
+                      onChange={e =>
+                        setCh({ ...ch, when: e.target.value })
+                      }
+                    />
+                    <small>
+                      Bab otomatis tampil untuk pembaca pada waktu ini
+                      (selisih maksimal sekitar 1 menit).
+                    </small>
+                  </label>
+                )}
+
+                {novel.type !== 'comic' && auto && (
+                  <small className={'autosave ' + auto}>
+                    {{
+                      pending: 'Perubahan belum tersimpan…',
+                      saving: 'Menyimpan draf…',
+                      saved: `✓ Draf tersimpan otomatis${autoAt ? ' pukul ' + autoAt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''}`,
+                      error: '⚠ Gagal menyimpan otomatis. Tulisanmu aman di perangkat ini; tekan Simpan saat koneksi pulih.',
+                      notitle: 'Isi judul bab agar draf tersimpan otomatis.',
+                      local: 'Bab ini sudah terbit. Perubahan baru hanya tersimpan di perangkat ini sampai kamu menekan Simpan.'
+                    }[auto]}
+                  </small>
+                )}
 
                 <div className="row">
                   <button

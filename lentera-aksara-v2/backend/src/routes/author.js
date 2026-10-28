@@ -6,8 +6,9 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { db } from '../db.js';
 import { auth, requireRole, validate } from '../middleware.js';
+import { publishDueMiddleware } from '../publishDue.js';
 const r = Router();
-r.use(auth, requireRole('author', 'admin'));
+r.use(auth, requireRole('author', 'admin'), publishDueMiddleware);
 
 const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
 const upload = multer({ limits: { fileSize: 2 * 1024 * 1024 }, storage: multer.memoryStorage(),
@@ -36,7 +37,12 @@ const novelSchema = z.object({ title: z.string().min(3, 'Judul minimal 3 karakte
   synopsis: z.string().max(3000).default(''), tags: z.string().max(255).default(''),
   status: z.enum(['ongoing', 'completed']), type: z.enum(['novel', 'comic']).default('novel'), genreIds: z.array(z.number().int()).max(5, 'Maksimal 5 genre') });
 const chapterSchema = z.object({ title: z.string().min(1, 'Judul bab wajib diisi').max(150),
-  content: z.string().max(200000).default(''), status: z.enum(['draft', 'published']) });
+  content: z.string().max(200000).default(''), status: z.enum(['draft', 'published']),
+  // Jadwal terbit (ISO). Hanya dipakai bila status 'draft'. null = tanpa jadwal.
+  publishAt: z.string().nullable().optional().refine(v => v == null || !isNaN(Date.parse(v)), 'Waktu terbit tidak valid') });
+// Mengembalikan Date jika bab dijadwalkan, null jika tidak
+const whenOf = b => (b.status === 'draft' && b.publishAt) ? new Date(b.publishAt) : null;
+const autosaveSchema = z.object({ title: z.string().trim().min(1, 'Judul bab wajib diisi').max(150), content: z.string().max(200000).default('') });
 
 // Hanya pemilik novel yang boleh mengubahnya
 const own = async (req, res, next) => {
@@ -64,7 +70,7 @@ r.post('/novels', validate(novelSchema), async (req, res) => {
 r.get('/novels/:id', own, async (req, res) => {
   const [[n]] = await db.query('SELECT * FROM novels WHERE id=?', [req.params.id]);
   const [g] = await db.query('SELECT genre_id FROM novel_genres WHERE novel_id=?', [n.id]);
-  const [chapters] = await db.query('SELECT id,number,title,status FROM chapters WHERE novel_id=? ORDER BY number', [n.id]);
+  const [chapters] = await db.query('SELECT id,number,title,status,publish_at FROM chapters WHERE novel_id=? ORDER BY number', [n.id]);
   res.json({ ...n, genreIds: g.map(x => x.genre_id), chapters });
 });
 
@@ -93,24 +99,34 @@ r.post('/novels/:id/submit', own, async (req, res) => {
 r.delete('/novels/:id', own, async (req, res) => { await db.query('DELETE FROM novels WHERE id=?', [req.params.id]); res.json({ ok: true }); });
 
 r.get('/novels/:id/chapters/:chId', own, async (req, res) => {
-  const [[c]] = await db.query('SELECT id,number,title,content,status FROM chapters WHERE id=? AND novel_id=?', [req.params.chId, req.params.id]);
+  const [[c]] = await db.query('SELECT id,number,title,content,status,publish_at FROM chapters WHERE id=? AND novel_id=?', [req.params.chId, req.params.id]);
   if (!c) return res.status(404).json({ error: 'Bab tidak ditemukan.' });
   const [pages] = await db.query('SELECT id,position,image_url FROM chapter_pages WHERE chapter_id=? ORDER BY position', [c.id]);
   res.json({ ...c, pages });
 });
 r.post('/novels/:id/chapters', own, validate(chapterSchema), async (req, res) => {
-  const b = req.body;
+  const b = req.body, when = whenOf(b);
+  if (when && when <= new Date()) return res.status(400).json({ error: 'Waktu terbit harus di masa depan.' });
   const [[m]] = await db.query('SELECT COALESCE(MAX(number),0)+1 AS nx FROM chapters WHERE novel_id=?', [req.params.id]);
-  const [i] = await db.query('INSERT INTO chapters(novel_id,number,title,content,status) VALUES(?,?,?,?,?)', [req.params.id, m.nx, b.title, b.content, b.status]);
+  const [i] = await db.query('INSERT INTO chapters(novel_id,number,title,content,status,publish_at) VALUES(?,?,?,?,?,?)', [req.params.id, m.nx, b.title, b.content, b.status, when]);
   if (b.status === 'published') await notifyReaders(req.params.id, b.title, m.nx);
   res.status(201).json({ id: i.insertId, number: m.nx });
 });
 r.put('/novels/:id/chapters/:chId', own, validate(chapterSchema), async (req, res) => {
-  const b = req.body;
+  const b = req.body, when = whenOf(b);
+  if (when && when <= new Date()) return res.status(400).json({ error: 'Waktu terbit harus di masa depan.' });
   const [[old]] = await db.query('SELECT status,number FROM chapters WHERE id=? AND novel_id=?', [req.params.chId, req.params.id]);
-  await db.query('UPDATE chapters SET title=?,content=?,status=? WHERE id=? AND novel_id=?', [b.title, b.content, b.status, req.params.chId, req.params.id]);
+  await db.query('UPDATE chapters SET title=?,content=?,status=?,publish_at=? WHERE id=? AND novel_id=?', [b.title, b.content, b.status, when, req.params.chId, req.params.id]);
   if (old && old.status !== 'published' && b.status === 'published') await notifyReaders(req.params.id, b.title, old.number);
   res.json({ ok: true });
+});
+// Simpan draf otomatis: hanya judul + isi, tidak menyentuh status/jadwal, dan tidak pernah mengubah bab yang sudah terbit
+r.put('/novels/:id/chapters/:chId/autosave', own, validate(autosaveSchema), async (req, res) => {
+  const [[c]] = await db.query('SELECT status FROM chapters WHERE id=? AND novel_id=?', [req.params.chId, req.params.id]);
+  if (!c) return res.status(404).json({ error: 'Bab tidak ditemukan.' });
+  if (c.status === 'published') return res.json({ ok: true, skipped: true });
+  await db.query('UPDATE chapters SET title=?,content=? WHERE id=? AND novel_id=?', [req.body.title, req.body.content, req.params.chId, req.params.id]);
+  res.json({ ok: true, saved_at: new Date().toISOString() });
 });
 r.delete('/novels/:id/chapters/:chId', own, async (req, res) => {
   await db.query('DELETE FROM chapters WHERE id=? AND novel_id=?', [req.params.chId, req.params.id]); res.json({ ok: true });

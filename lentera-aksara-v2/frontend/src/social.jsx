@@ -5,26 +5,42 @@ import { useApp } from './ctx.js';
 
 const tgl = d => new Date(d).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 
-// ---------- Komentar di bawah bab ----------
+// ---------- Komentar di bawah bab (penulis dapat membalas) ----------
 export function Comments({ chapterId }) {
   const { user } = useApp();
   const [list, setList] = useState(null); const [text, setText] = useState(''); const [err, setErr] = useState('');
+  const [replyTo, setReplyTo] = useState(null); const [rtext, setRtext] = useState('');
   const load = () => api('/social/comments/' + chapterId).then(setList).catch(e => setErr(e.message));
-  useEffect(() => { setList(null); setErr(''); load(); }, [chapterId]);
+  useEffect(() => { setList(null); setErr(''); setReplyTo(null); setRtext(''); load(); }, [chapterId]);
   const send = async e => { e.preventDefault(); setErr('');
     try { await api('/social/comments/' + chapterId, { method: 'POST', body: { body: text } }); setText(''); load(); } catch (x) { setErr(x.message); } };
-  const del = async c => { if (!confirm('Hapus komentar ini?')) return;
+  const sendReply = async e => { e.preventDefault(); setErr('');
+    try { await api('/social/comments/' + chapterId, { method: 'POST', body: { body: rtext, parentId: replyTo } }); setRtext(''); setReplyTo(null); load(); } catch (x) { setErr(x.message); } };
+  const del = async c => { if (!confirm(c.parent_id ? 'Hapus balasan ini?' : 'Hapus komentar ini beserta balasannya?')) return;
     try { await api('/social/comments/' + c.id, { method: 'DELETE' }); load(); } catch (x) { setErr(x.message); } };
+  // Hanya penulis novel ini (atau admin) yang boleh membalas, dan hanya ke komentar utama
+  const canReply = c => user && !c.parent_id && (user.id === c.author_id || user.role === 'admin');
+  const one = c => (<div className={'comment card' + (c.parent_id ? ' reply' : '')} key={c.id}>
+    <div className="row" style={{ justifyContent: 'space-between' }}>
+      <span><b>{c.username}</b>{c.is_author ? <> <span className="badge ongoing">Penulis</span></> : null}</span><small>{tgl(c.created_at)}</small></div>
+    <p>{c.body}</p>
+    <div className="row">
+      {canReply(c) && <button className="icon" onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setRtext(''); }}>Balas</button>}
+      {user && (user.id === c.user_id || user.role === 'admin') && <button className="icon" onClick={() => del(c)}>Hapus</button>}</div>
+    {replyTo === c.id && <form onSubmit={sendReply} className="cform">
+      <textarea rows={2} maxLength={1000} autoFocus placeholder={`Balas ${c.username}…`} value={rtext} onChange={e => setRtext(e.target.value)} />
+      <div className="row"><button className="btn btn-primary" disabled={!rtext.trim()}>Kirim balasan</button>
+        <button type="button" className="btn btn-dark" onClick={() => { setReplyTo(null); setRtext(''); }}>Batal</button></div></form>}</div>);
+  const tops = (list || []).filter(c => !c.parent_id);
+  const kids = id => (list || []).filter(c => c.parent_id === id).sort((a, b) => a.id - b.id);
   return (<section className="comments"><h3>💬 Komentar{list ? ` (${list.length})` : ''}</h3>
     {user ? <form onSubmit={send} className="cform"><textarea rows={3} maxLength={1000} placeholder="Tulis komentar…" value={text} onChange={e => setText(e.target.value)} />
         <button className="btn btn-primary" disabled={!text.trim()}>Kirim</button></form>
       : <p className="state"><Link to="/masuk">Masuk</Link> untuk berkomentar.</p>}
     {err && <p className="state err">{err}</p>}
     {list === null ? <p className="state">Memuat komentar…</p> : list.length === 0 ? <p className="state">Belum ada komentar. Jadilah yang pertama!</p> :
-      list.map(c => <div className="comment card" key={c.id}>
-        <div className="row" style={{ justifyContent: 'space-between' }}><b>{c.username}</b><small>{tgl(c.created_at)}</small></div>
-        <p>{c.body}</p>
-        {user && (user.id === c.user_id || user.role === 'admin') && <button className="icon" onClick={() => del(c)}>Hapus</button>}</div>)}</section>);
+      tops.map(c => <div key={c.id}>{one(c)}
+        {kids(c.id).length > 0 && <div className="creplies">{kids(c.id).map(one)}</div>}</div>)}</section>);
 }
 
 // ---------- Lonceng notifikasi di bar atas ----------
